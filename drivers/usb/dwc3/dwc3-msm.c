@@ -1573,6 +1573,8 @@ static int dwc3_msm_gsi_ep_op(struct usb_ep *ep,
 
 	dbg_log_string("%s(%d):%s", ep->name, ep->ep_num, gsi_op_to_string(op));
 
+	dbg_log_string("%s(%d):%s", ep->name, ep->ep_num, gsi_op_to_string(op));
+
 	switch (op) {
 	case GSI_EP_OP_PREPARE_TRBS:
 		request = (struct usb_gsi_request *)op_data;
@@ -1630,7 +1632,8 @@ static int dwc3_msm_gsi_ep_op(struct usb_ep *ep,
 		spin_unlock_irqrestore(&dwc->lock, flags);
 		break;
 	case GSI_EP_OP_CHECK_FOR_SUSPEND:
-		ret = gsi_check_ready_to_suspend(mdwc);
+		f_suspend = *((bool *)op_data);
+		ret = gsi_check_ready_to_suspend(ep, f_suspend);
 		break;
 	case GSI_EP_OP_DISABLE:
 		ret = ep->ops->disable(ep);
