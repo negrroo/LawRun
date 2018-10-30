@@ -281,6 +281,8 @@ endif
 ifeq ($(ARCH),sh64)
        SRCARCH := sh
 endif
+EXTRA_CFLAGS += -I$(src)/inc
+EXTRA_CFLAGS += -Werror
 
 # Additional ARCH settings for tile
 ifeq ($(ARCH),tilepro)
