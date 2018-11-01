@@ -351,6 +351,8 @@ struct cam_req_mgr_core_link {
 	atomic_t                             is_used;
 	int32_t                              num_sof_src;
 	struct cam_req_mgr_dev_sof_evt       dev_sof_evt[3];
+	uint32_t                             last_flush_id;
+	atomic_t                             is_used;
 };
 
 /**
