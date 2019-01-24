@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+/* DTS_EAGLE START */
+>>>>>>> c5b95ad12487... drivers: dts_eagle software driver port
 #ifndef DTS_EAGLE_DRV_H
 #define DTS_EAGLE_DRV_H
 
@@ -55,3 +59,7 @@ struct dts_eagle_cache_block {
 } __packed;
 
 #endif
+<<<<<<< HEAD
+=======
+/* DTS_EAGLE END */
+>>>>>>> c5b95ad12487... drivers: dts_eagle software driver port
