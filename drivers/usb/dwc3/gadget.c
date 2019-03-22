@@ -1986,20 +1986,25 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on, int suspend)
 		 */
 		dwc3_stop_active_transfers(dwc);
 
+		reg &= ~DWC3_DCTL_RUN_STOP;
+
+		if (dwc->has_hibernation && !suspend)
+			reg &= ~DWC3_DCTL_KEEP_CONNECT;
+	}
+
+	dwc3_writel(dwc->regs, DWC3_DCTL, reg);
+
+	/* Controller is not halted until the events are acknowledged */
+	if (!is_on) {
 		/*
 		 * Clear out any pending events (i.e. End Transfer Command
-		 * Complete) before clearing run/stop
+		 * Complete).
 		 */
 		reg1 = dwc3_readl(dwc->regs, DWC3_GEVNTCOUNT(0));
 		reg1 &= DWC3_GEVNTCOUNT_MASK;
 		dbg_log_string("remaining EVNTCOUNT(0)=%d", reg1);
 		dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(0), reg1);
 		dwc3_notify_event(dwc, DWC3_GSI_EVT_BUF_CLEAR, 0);
-
-		reg &= ~DWC3_DCTL_RUN_STOP;
-
-		if (dwc->has_hibernation && !suspend)
-			reg &= ~DWC3_DCTL_KEEP_CONNECT;
 	}
 
 	dwc3_writel(dwc->regs, DWC3_DCTL, reg);
