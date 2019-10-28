@@ -2030,6 +2030,7 @@ int mhi_dev_channel_isempty(struct mhi_dev_client *handle)
 }
 EXPORT_SYMBOL(mhi_dev_channel_isempty);
 
+
 bool mhi_dev_channel_has_pending_write(struct mhi_dev_client *handle)
 {
 	struct mhi_dev_channel *ch;
@@ -2075,16 +2076,6 @@ int mhi_dev_close_channel(struct mhi_dev_client *handle)
 			mhi_log(MHI_MSG_DBG,
 				"Trying to close an active channel (%d)\n",
 				ch->ch_id);
-			rc = -EAGAIN;
-			goto exit;
-		} else if (ch->tre_loc) {
-			mhi_log(MHI_MSG_ERROR,
-				"Trying to close channel (%d) when a TRE is active",
-				ch->ch_id);
-			rc = -EAGAIN;
-			goto exit;
-		}
-	}
 
 	ch->state = MHI_DEV_CH_CLOSED;
 	ch->active_client = NULL;
@@ -2093,9 +2084,9 @@ int mhi_dev_close_channel(struct mhi_dev_client *handle)
 	ch->ereqs = NULL;
 	ch->tr_events = NULL;
 	kfree(handle);
-exit:
+
 	mutex_unlock(&ch->ch_lock);
-	return rc;
+	return;
 }
 EXPORT_SYMBOL(mhi_dev_close_channel);
 

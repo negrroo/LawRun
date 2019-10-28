@@ -1828,16 +1828,8 @@ static void mhi_uci_at_ctrl_client_cb(struct mhi_dev_client_cb_data *cb_data)
 		uci_ctxt.at_ctrl_wq = NULL;
 		if (!(client->f_flags & O_SYNC))
 			kfree(client->wreqs);
-		rc = mhi_dev_close_channel(client->out_handle);
-		if (rc)
-			uci_log(UCI_DBG_INFO,
-			"Failed to close channel %d ret %d\n",
-			client->out_chan, rc);
-		rc = mhi_dev_close_channel(client->in_handle);
-		if (rc)
-			uci_log(UCI_DBG_INFO,
-			"Failed to close channel %d ret %d\n",
-			client->in_chan, rc);
+		mhi_dev_close_channel(client->out_handle);
+		mhi_dev_close_channel(client->in_handle);
 	}
 }
 
