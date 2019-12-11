@@ -1091,6 +1091,9 @@ int dwc3_core_pre_init(struct dwc3 *dwc)
 		}
 	}
 
+	/* de-assert DRVVBUS for HOST and OTG mode */
+	dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_DEVICE);
+
 	return ret;
 }
 
