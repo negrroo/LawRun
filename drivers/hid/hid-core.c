@@ -549,6 +549,7 @@ static int hid_parser_local(struct hid_parser *parser, struct hid_item *item)
  * usage value."
  */
 
+
 static void hid_concatenate_last_usage_page(struct hid_parser *parser)
 {
 	int i;
@@ -586,7 +587,7 @@ static int hid_parser_main(struct hid_parser *parser, struct hid_item *item)
 	__u32 data;
 	int ret;
 
-	hid_concatenate_last_usage_page(parser);
+	hid_concatenate_usage_page(parser);
 
 	data = item_udata(item);
 
@@ -805,7 +806,7 @@ static int hid_scan_main(struct hid_parser *parser, struct hid_item *item)
 	__u32 data;
 	int i;
 
-	hid_concatenate_last_usage_page(parser);
+	hid_concatenate_usage_page(parser);
 
 	data = item_udata(item);
 
