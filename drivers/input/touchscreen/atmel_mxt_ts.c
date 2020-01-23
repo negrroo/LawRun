@@ -731,7 +731,6 @@ struct mxt_data {
 	u8 config_info[MXT_CONFIG_INFO_SIZE];
 	u8 is_usb_plug_in;
 
-	int dbclick_count;
 	bool is_suspend;
 	struct mutex ts_lock;
 	/* Slowscan parameters	*/
@@ -2377,7 +2376,7 @@ static const char *mxt_get_config(struct mxt_data *data, bool is_default)
 	}
 
 	for (i = 0; i < pdata->config_array_size; i++) {
-		if (data->info.family_id== pdata->config_array[i].family_id &&
+		if (data->info.family_id == pdata->config_array[i].family_id &&
 			data->info.variant_id == pdata->config_array[i].variant_id &&
 			data->info.version == pdata->config_array[i].version &&
 			data->info.build == pdata->config_array[i].build &&
@@ -2548,7 +2547,6 @@ static int mxt_check_reg_init(struct mxt_data *data)
 	int ret = 0;
 	const char *config_name = NULL;
 	bool is_recheck = false, use_default_cfg = false;
-	u8 *tp_maker = NULL;
 
 	if (data->firmware_updated)
 		use_default_cfg = true;
@@ -2622,11 +2620,7 @@ start:
 			dev_err(dev, "No lockdown info stored\n");
 		}
 	}
-
-	tp_maker = kzalloc(20, GFP_KERNEL);
-	if (tp_maker == NULL)
-		dev_err(dev, "fail to alloc vendor name memory\n");
-
+	update_hardware_info(TYPE_TP_MAKER, data->panel_id - 0x31);
 	config_name = mxt_get_config(data, use_default_cfg);
 
 	if (data->config_info[0] >= 0x65) {
@@ -2975,6 +2969,18 @@ static int mxt_configure_regulator(struct mxt_data *data, bool enabled)
 		goto err_null_regulator_vddio;
 	}
 
+#if 0
+	if (regulator_count_voltages(data->regulator_vddio) > 1) {
+		ret = regulator_set_voltage(data->regulator_vddio,
+				MXT_VDDIO_MIN_UV, MXT_VDDIO_MAX_UV);
+		if (ret < 0) {
+			dev_err(&client->dev,
+				"regulator_set_voltage for vddio failed: %d\n", ret);
+			return ret;
+		}
+	}
+#endif
+
 	ret = regulator_enable(data->regulator_vddio);
 	if (ret < 0) {
 		dev_err(&client->dev,
@@ -3076,7 +3082,7 @@ static int mxt_do_self_tune(struct mxt_data *data, u8 cmd)
 
 	error = mxt_wait_for_self_tune_msg(data, cmd);
 
-	if (!error) {
+	if(!error) {
 		if (data->selfcap_status.error_code != 0)
 			return -EINVAL;
 	}
@@ -4909,6 +4915,7 @@ static void mxt_switch_mode_work(struct work_struct *work)
 	const struct mxt_platform_data *pdata = data->pdata;
 	int index = data->current_index;
 	u8 value = ms->mode;
+
 	if (value == MXT_INPUT_EVENT_STYLUS_MODE_ON ||
 				value == MXT_INPUT_EVENT_STYLUS_MODE_OFF)
 		mxt_stylus_mode_switch(data, (bool)(value - MXT_INPUT_EVENT_STYLUS_MODE_OFF));
@@ -6743,6 +6750,7 @@ static int mxt_probe(struct i2c_client *client,
 	mxt_debugfs_init(data);
 
 	normal_mode_reg_save(data);
+	update_hardware_info(TYPE_TOUCH, 2);
 	data->finish_init = 1;
 
 	proc_create("tp_selftest", 0664, NULL, &mxt_selftest_ops);
