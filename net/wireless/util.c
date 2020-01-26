@@ -539,7 +539,7 @@ __frame_add_frag(struct sk_buff *skb, struct page *page,
 	struct skb_shared_info *sh = skb_shinfo(skb);
 	int page_offset;
 
-	page_ref_inc(page);
+	get_page(page);
 	page_offset = ptr - page_address(page);
 	skb_add_rx_frag(skb, sh->nr_frags, page, page_offset, len, size);
 }
@@ -1720,53 +1720,47 @@ const unsigned char bridge_tunnel_header[] __aligned(2) =
 	{ 0xaa, 0xaa, 0x03, 0x00, 0x00, 0xf8 };
 EXPORT_SYMBOL(bridge_tunnel_header);
 
-bool cfg80211_is_gratuitous_arp_unsolicited_na(struct sk_buff *skb)
+/* Layer 2 Update frame (802.2 Type 1 LLC XID Update response) */
+struct iapp_layer2_update {
+	u8 da[ETH_ALEN];	/* broadcast */
+	u8 sa[ETH_ALEN];	/* STA addr */
+	__be16 len;		/* 6 */
+	u8 dsap;		/* 0 */
+	u8 ssap;		/* 0 */
+	u8 control;
+	u8 xid_info[3];
+} __packed;
+
+void cfg80211_send_layer2_update(struct net_device *dev, const u8 *addr)
 {
-	const struct ethhdr *eth = (void *)skb->data;
-	const struct {
-		struct arphdr hdr;
-		u8 ar_sha[ETH_ALEN];
-		u8 ar_sip[4];
-		u8 ar_tha[ETH_ALEN];
-		u8 ar_tip[4];
-	} __packed *arp;
-	const struct ipv6hdr *ipv6;
-	const struct icmp6hdr *icmpv6;
+	struct iapp_layer2_update *msg;
+	struct sk_buff *skb;
 
-	switch (eth->h_proto) {
-	case cpu_to_be16(ETH_P_ARP):
-		/* can't say - but will probably be dropped later anyway */
-		if (!pskb_may_pull(skb, sizeof(*eth) + sizeof(*arp)))
-			return false;
+	/* Send Level 2 Update Frame to update forwarding tables in layer 2
+	 * bridge devices */
 
-		arp = (void *)(eth + 1);
+	skb = dev_alloc_skb(sizeof(*msg));
+	if (!skb)
+		return;
+	msg = (struct iapp_layer2_update *)skb_put(skb, sizeof(*msg));
 
-		if ((arp->hdr.ar_op == cpu_to_be16(ARPOP_REPLY) ||
-		     arp->hdr.ar_op == cpu_to_be16(ARPOP_REQUEST)) &&
-		    !memcmp(arp->ar_sip, arp->ar_tip, sizeof(arp->ar_sip)))
-			return true;
-		break;
-	case cpu_to_be16(ETH_P_IPV6):
-		/* can't say - but will probably be dropped later anyway */
-		if (!pskb_may_pull(skb, sizeof(*eth) + sizeof(*ipv6) +
-					sizeof(*icmpv6)))
-			return false;
+	/* 802.2 Type 1 Logical Link Control (LLC) Exchange Identifier (XID)
+	 * Update response frame; IEEE Std 802.2-1998, 5.4.1.2.1 */
 
-		ipv6 = (void *)(eth + 1);
-		icmpv6 = (void *)(ipv6 + 1);
+	eth_broadcast_addr(msg->da);
+	ether_addr_copy(msg->sa, addr);
+	msg->len = htons(6);
+	msg->dsap = 0;
+	msg->ssap = 0x01;	/* NULL LSAP, CR Bit: Response */
+	msg->control = 0xaf;	/* XID response lsb.1111F101.
+				 * F=0 (no poll command; unsolicited frame) */
+	msg->xid_info[0] = 0x81;	/* XID format identifier */
+	msg->xid_info[1] = 1;	/* LLC types/classes: Type 1 LLC */
+	msg->xid_info[2] = 0;	/* XID sender's receive window size (RW) */
 
-		if (icmpv6->icmp6_type == NDISC_NEIGHBOUR_ADVERTISEMENT &&
-		    !memcmp(&ipv6->saddr, &ipv6->daddr, sizeof(ipv6->saddr)))
-			return true;
-		break;
-	default:
-		/*
-		 * no need to support other protocols, proxy service isn't
-		 * specified for any others
-		 */
-		break;
-	}
-
-	return false;
+	skb->dev = dev;
+	skb->protocol = eth_type_trans(skb, dev);
+	memset(skb->cb, 0, sizeof(skb->cb));
+	netif_rx_ni(skb);
 }
-EXPORT_SYMBOL(cfg80211_is_gratuitous_arp_unsolicited_na);
+EXPORT_SYMBOL(cfg80211_send_layer2_update);
