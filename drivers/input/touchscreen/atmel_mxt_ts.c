@@ -2462,48 +2462,8 @@ static int mxt_read_rev(struct mxt_data *data)
 
 		if (val == 0)
 			break;
-
-		case MXT_TOUCH_MULTI_T9:
-			data->multitouch = MXT_TOUCH_MULTI_T9;
-			/* Only handle messages from first T9 instance */
-			data->T9_reportid_min = min_id;
-			data->T9_reportid_max = min_id +
-						object->num_report_ids - 1;
-			data->num_touchids = object->num_report_ids;
-			break;
-		case MXT_SPT_MESSAGECOUNT_T44:
-			data->T44_address = object->start_address;
-			break;
-		case MXT_SPT_GPIOPWM_T19:
-			data->T19_reportid = min_id;
-			break;
-		case MXT_TOUCH_MULTITOUCHSCREEN_T100:
-			data->multitouch = MXT_TOUCH_MULTITOUCHSCREEN_T100;
-			data->T100_reportid_min = min_id;
-			data->T100_reportid_max = max_id;
-			/* first two report IDs reserved */
-			data->num_touchids = object->num_report_ids - 2;
-			break;
-		}
-
-		end_address = object->start_address
-			+ mxt_obj_size(object) * mxt_obj_instances(object) - 1;
-
-		if (end_address >= data->mem_size)
-			data->mem_size = end_address + 1;
-
 		i++;
 		msleep(10);
-	}
-
-	/* Store maximum reportid */
-	data->max_reportid = reportid;
-
-	/* If T44 exists, T5 position has to be directly after */
-	if (data->T44_address && (data->T5_address != data->T44_address + 1)) {
-		dev_err(&client->dev, "Invalid T44 position\n");
-		error = -EINVAL;
-		goto free_object_table;
 	}
 
 	ret = mxt_read_object(data, MXT_DEBUG_DIAGNOSTIC_T37,
