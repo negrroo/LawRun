@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 - 2017 Novatek, Inc.
- * Copyright (C) 2018 XiaoMi, Inc.
+ * Copyright (C) 2019 XiaoMi, Inc.
  *
  * $Revision: 21600 $
  * $Date: 2018-01-12 15:21:45 +0800 (週五, 12 一月 2018) $
@@ -32,7 +32,7 @@
 #define SIZE_64KB 65536
 #define BLOCK_64KB_NUM 4
 
-const struct firmware *fw_entry = NULL;
+const struct firmware *fw_entry;
 
 /*******************************************************
 Description:
@@ -85,7 +85,7 @@ void update_firmware_release(void)
 	if (fw_entry) {
 		release_firmware(fw_entry);
 	}
-	fw_entry = NULL;
+	fw_entry=NULL;
 }
 
 /*******************************************************
@@ -211,7 +211,7 @@ int32_t Check_CheckSum(void)
 
 	if (Resume_PD()) {
 		NVT_ERR("Resume PD error!!\n");
-		return -1;
+		return -EPERM;
 	}
 
 	fw_bin_size = fw_entry->size;
@@ -636,11 +636,11 @@ int32_t Write_Flash(void)
 			}
 		}
 		if (fw_entry->size - Flash_Address >= 256)
-			tmpvalue = (Flash_Address >> 16) + ((Flash_Address >> 8) & 0xFF) + (Flash_Address & 0xFF) + 0x00 + (255);
+			tmpvalue=(Flash_Address >> 16) + ((Flash_Address >> 8) & 0xFF) + (Flash_Address & 0xFF) + 0x00 + (255);
 		else
-			tmpvalue = (Flash_Address >> 16) + ((Flash_Address >> 8) & 0xFF) + (Flash_Address & 0xFF) + 0x00 + (fw_entry->size - Flash_Address - 1);
+			tmpvalue=(Flash_Address >> 16) + ((Flash_Address >> 8) & 0xFF) + (Flash_Address & 0xFF) + 0x00 + (fw_entry->size - Flash_Address - 1);
 
-		for (k = 0; k < min(fw_entry->size - Flash_Address,(size_t)256); k++)
+		for (k = 0;k < min(fw_entry->size - Flash_Address,(size_t)256); k++)
 			tmpvalue += fw_entry->data[Flash_Address + k];
 
 		tmpvalue = 255 - tmpvalue + 1;
