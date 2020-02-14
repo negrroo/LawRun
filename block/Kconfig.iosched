@@ -21,6 +21,10 @@ config IOSCHED_DEADLINE
 	  a new point in the service tree and doing a batch of IO from there
 	  in case of expiry.
 
+config IOSCHED_MAPLE
+	tristate "Maple I/O scheduler"
+	default y
+
 config IOSCHED_ANXIETY
 	tristate "Anxiety I/O Scheduler"
 	default y
@@ -68,6 +72,9 @@ choice
 	  Select the I/O scheduler which will be used by default for all
 	  block devices.
 
+	config DEFAULT_MAPLE
+		bool "Maple" if IOSCHED_MAPLE=y
+
     config DEFAULT_ANXIETY
 		bool "Anxiety" if IOSCHED_ANXIETY=y
 
@@ -90,6 +97,7 @@ config DEFAULT_IOSCHED
 	default "deadline" if DEFAULT_DEADLINE
 	default "cfq" if DEFAULT_CFQ
 	default "noop" if DEFAULT_NOOP
+	default "maple" if DEFAULT_MAPLE
         default "anxiety" if DEFAULT_ANXIETY
 	default "zen" if DEFAULT_ZEN
 
