@@ -57,6 +57,11 @@
 		qcom,mdss-dsi-te-using-te-pin;
 		qcom,mdss-dsi-tx-eot-append;
 		qcom,mdss-panel-on-dimming-delay = <120>;
+
+		qcom,ulps-enabled;
+		qcom,suspend-ulps-enabled;
+		qcom,panel-allow-phy-poweroff;
+
 		qcom,mdss-night-brightness = <7 25 43 61>;
 		qcom,mdss-dsi-display-timings {
 			timing@0{
