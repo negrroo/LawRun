@@ -172,6 +172,8 @@ struct nvt_ts_data {
 	bool dump_click_count;
 	char *current_clicknum_file;
 #endif
+	bool palm_sensor_changed;
+	bool palm_sensor_switch;
 
 };
 
@@ -216,6 +218,7 @@ extern int32_t nvt_check_fw_reset_state(RST_COMPLETE_STATE check_reset_state);
 extern int32_t nvt_get_fw_info(void);
 extern int32_t nvt_clear_fw_status(void);
 extern int32_t nvt_check_fw_status(void);
+int32_t nvt_set_pocket_palm_switch(uint8_t pocket_palm_switch);
 #if NVT_TOUCH_ESD_PROTECT
 extern void nvt_esd_check_enable(uint8_t enable);
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
