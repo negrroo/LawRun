@@ -46,6 +46,7 @@ enum  MODE_TYPE {
 	Touch_Panel_Orientation = 8,
 	Touch_Report_Rate      = 9,
 	Touch_Mode_NUM         = 10,
+	Touch_Resist_RF        = 12,
 };
 
 struct xiaomi_touch_interface {
