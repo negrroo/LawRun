@@ -1,0 +1,20 @@
+# FRANKO KERNEL MANAGER
+# Ramdisk file for profile based kernel management
+# Implimentation inspired by Franco's fku profiles
+# Based on spectrum profiles
+
+# Power saving profile
+on property:fku.perf.profile=0
+    setprop persist.spectrum.profile 2
+
+# Balance
+on property:fku.perf.profile=1
+    setprop persist.spectrum.profile 0
+
+# Performance
+on property:fku.perf.profile=2
+    setprop persist.spectrum.profile 1
+
+# Clearing (Default)
+on property:fku.perf.profile=3
+    setprop persist.spectrum.profile 4
