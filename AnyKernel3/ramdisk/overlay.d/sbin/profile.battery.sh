@@ -17,6 +17,10 @@
             #=================================================#
 ##############################LawRun-Balanced###################################
 
+# Profile Log
+dt=`date '+%d/%m/%Y %H:%M:%S'`
+echo "$dt Battery LRK applied" >> /storage/emulated/0/LawRun-Kernel/log.txt
+
 ################################################################################
 
                           #####################
@@ -120,9 +124,16 @@ echo "2800000" > /sys/class/power_supply/battery/constant_charge_current_max
 echo "Y" > /sys/module/workqueue/parameters/power_efficient
 
 # Thermals
-chmod 664 /sys/class/thermal/thermal_message/sconfig
-echo -1 > /sys/class/thermal/thermal_message/sconfig
-chmod 644 /sys/class/thermal/thermal_message/sconfig
+echo "-1" > /sys/class/thermal/thermal_message/sconfig
+
+# Scale down in low write load
+# That change tried to fix a problem for clock scaling during write requests.
+# The default value for it is "0" (favor for downscale).
+# For users who want performance over power they should set it to "1" (favor for upscale)
+write /sys/class/mmc_host/mmc0/clk_scaling/scale_down_in_low_wr_load 0
+
+# Panel Backlight
+write /sys/class/leds/lcd-backlight/max_brightness 100
 
 ################################################################################
 
@@ -147,10 +158,6 @@ swapoff /dev/block/zram0
 echo 1 > /sys/block/zram0/reset
 echo 0 > /sys/block/zram0/disksize
 echo 0 > /proc/sys/vm/swappiness
-
-# Profile Log
-dt=`date '+%d/%m/%Y %H:%M:%S'`
-echo "$dt Battery LRK-P applied" >> /storage/emulated/0/LawRun-Kernel/log.txt
 
 ################################LawRun-END#######################################
 

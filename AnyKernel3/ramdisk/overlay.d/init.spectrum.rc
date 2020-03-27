@@ -1,3 +1,5 @@
+# negrroo
+# LawRun-Kernel Edit.
 # SPECTRUM KERNEL MANAGER
 # Ramdisk file for profile based kernel management
 # Implimentation inspired by Franco's fku profiles
@@ -6,9 +8,9 @@
    setprop persist.spectrum.kernel LawRun
 
 
-# Balance
+# Balance L
 on property:persist.spectrum.profile=0
-   exec u:r:magisk:s0 root root -- /sbin/profile.balance.sh
+   exec u:r:magisk:s0 root root -- /sbin/profile.Lbalance.sh
 
 # Performance 
 on property:persist.spectrum.profile=1
@@ -22,6 +24,6 @@ on property:persist.spectrum.profile=2
 on property:persist.spectrum.profile=3
    exec u:r:magisk:s0 root root -- /sbin/profile.gaming.sh
 
-# Clearing (Default)
+# Balanced H (Default)
 on property:persist.spectrum.profile=4
-   exec u:r:magisk:s0 root root -- /sbin/profile.Init.sh
+   exec u:r:magisk:s0 root root -- /sbin/profile.Hbalance.sh

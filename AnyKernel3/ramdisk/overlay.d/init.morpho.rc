@@ -1,0 +1,25 @@
+# negrroo
+# LawRun-Kernel Edit.
+# MORPHO KERNEL MANAGER
+# Ramdisk file for profile based kernel management
+# Implimentation inspired by Franco's fku profiles
+
+# Ultra Battery
+	on property:persist.morpho.profile=1
+    setprop persist.spectrum.profile 2
+
+# Battery
+	on property:persist.morpho.profile=2
+    setprop persist.spectrum.profile 0
+
+# Balanced (Default)
+	on property:persist.morpho.profile=3
+    setprop persist.spectrum.profile 4
+
+# Performance
+	on property:persist.morpho.profile=4
+    setprop persist.spectrum.profile 1
+
+# Gaming
+	on property:persist.morpho.profile=5
+    setprop persist.spectrum.profile 3

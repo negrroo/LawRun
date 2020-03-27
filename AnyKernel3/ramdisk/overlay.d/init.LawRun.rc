@@ -4,13 +4,14 @@
 # Negrroo                  #                   #   **      *    *   **   **    #
 # SPECTRUM KERNEL MANAGER  #  LawRun Features  #   **      ******   **  **     #
 # Franco's fku profiles    #                   #   **      **       *****      #
-# Morpho KERNEL MANAGER    #####################   ******* ** **    **  **     #
+# Dont Copy :')            #####################   ******* ** **    **  **     #
 # Just Try to be like us   #LawRuninit.Settings#   ******* **   **  **   **    #
 ##############################LawRun-Ramdisk####################################
 
 # Import profiles
 import /init.spectrum.rc
 import /init.performance_profiles.rc
+import /init.morpho.rc
 
 on init
 
@@ -27,6 +28,9 @@ on property:sys.boot_completed=1
     # Enable Franko Kernel Manager support
     setprop fku.profiles 1
 
+    # Enable Spectrum support
+    setprop morpho.support 1
+
 # Allow permissions
     chown system system /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
     chown system system /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq
@@ -35,24 +39,13 @@ on property:sys.boot_completed=1
     chown system system /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
     chown system system /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor
 
-    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
-    chmod 0664 /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq
-    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
-    chmod 0664 /sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq
-    chmod 0664 /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
-    chmod 0664 /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor
-
     chmod system system /sys/class/kgsl/kgsl-3d0/devfreq/max_freq
     chmod system system /sys/class/kgsl/kgsl-3d0/devfreq/min_freq
     chmod system system /sys/class/kgsl/kgsl-3d0/devfreq/governor
 
-    chmod 0664 /sys/class/kgsl/kgsl-3d0/devfreq/max_freq
-    chmod 0664 /sys/class/kgsl/kgsl-3d0/devfreq/min_freq
-    chmod 0664 /sys/class/kgsl/kgsl-3d0/devfreq/governor
+    chmod system system /sys/class/power_supply/battery/constant_charge_current_max
 
-    chmod 0664 /sys/class/power_supply/battery/constant_charge_current_max
-
-    chmod 0644 /sys/class/thermal/thermal_message/sconfig
+    chmod system system /sys/class/thermal/thermal_message/sconfig
 
 # Execute LawRun Default Profile
     exec u:r:magisk:s0 root root -- /sbin/init.special_power.sh

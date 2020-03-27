@@ -79,7 +79,45 @@ if [ -d $ramdisk/overlay ]; then
   rm -rf $ramdisk/overlay;
 fi;
 
+# Optimize F2FS extension list (@arter97)
+if mountpoint -q /data; then
+  for list_path in $(find /sys/fs/f2fs* -name extension_list); do
+
+    ui_print "  • Optimizing F2FS extension list"
+    echo "Optimizing F2FS extension list"
+    echo "Updating extension list: $list_path"
+
+    echo "Clearing extension list"
+
+    hot_count="$(grep -n 'hot file extens' $list_path | cut -d':' -f1)"
+    list_len="$(cat $list_path | wc -l)"
+    cold_count="$((list_len - hot_count))"
+
+    cold_list="$(head -n$((hot_count - 1)) $list_path | grep -v ':')"
+    hot_list="$(tail -n$cold_count $list_path)"
+
+    for ext in $cold_list; do
+      [ ! -z $ext ] && echo "[c]!$ext" > $list_path
+    done
+
+    for ext in $hot_list; do
+      [ ! -z $ext ] && echo "[h]!$ext" > $list_path
+    done
+    ui_print "  • Writing new extension list"
+    echo "Writing new extension list"
+
+    for ext in $(cat $home/f2fs-cold.list | grep -v '#'); do
+      [ ! -z $ext ] && echo "[c]$ext" > $list_path
+    done
+
+    for ext in $(cat $home/f2fs-hot.list); do
+      [ ! -z $ext ] && echo "[h]$ext" > $list_path
+    done
+  done
+fi
+
 # end ramdisk changes
 
 write_boot;
 ## end install
+

@@ -15,11 +15,11 @@
             #        *******     ** **       **  **           #
             #        *******     **   **     **   **          #
             #=================================================#
-############################LawRun-Performance##################################
+##############################LawRun-Balanced###################################
 
 # Profile Log
 dt=`date '+%d/%m/%Y %H:%M:%S'`
-echo "$dt Performance LRK applied" >> /storage/emulated/0/LawRun-Kernel/log.txt
+echo "$dt LBalanced LRK applied" >> /storage/emulated/0/LawRun-Kernel/log.txt
 
 ################################################################################
 
@@ -32,39 +32,39 @@ echo "$dt Performance LRK applied" >> /storage/emulated/0/LawRun-Kernel/log.txt
 ################################################################################
 
 # SILVER Cluster
-echo "schedutil" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+echo "PIXEL_SMURFUTIL" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
 echo "300000" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq
 echo "1766400" > /sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq
 
 # GOLD Cluster
-echo "schedutil" > /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor
+echo "blu_schedutil" > /sys/devices/system/cpu/cpu4/cpufreq/scaling_governor
 echo "825600" > /sys/devices/system/cpu/cpu4/cpufreq/scaling_min_freq
-echo "2803200" > /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq
+echo "2323200" > /sys/devices/system/cpu/cpu4/cpufreq/scaling_max_freq
 
 # BOost
-echo "1516800" > /sys/module/cpu_input_boost/parameters/input_boost_freq_lp
-echo "1363200" > /sys/module/cpu_input_boost/parameters/input_boost_freq_hp
-echo "125" > /sys/module/cpu_input_boost/parameters/input_boost_duration
+echo "1132800" > /sys/module/cpu_input_boost/parameters/input_boost_freq_lp
+echo "902400" > /sys/module/cpu_input_boost/parameters/input_boost_freq_hp
+echo "100" > /sys/module/cpu_input_boost/parameters/input_boost_duration
 
 # Dynamic Schedtune Boost
-echo "2000" > /sys/module/cpu_input_boost/parameters/dynamic_stune_boost_duration
-echo "50" > /sys/module/cpu_input_boost/parameters/dynamic_stune_boost
+echo "1500" > /sys/module/cpu_input_boost/parameters/dynamic_stune_boost_duration
+echo "25" > /sys/module/cpu_input_boost/parameters/dynamic_stune_boost
 
 # SILVER Cluster Limiter
-echo "0" > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/down_rate_limit_us
-echo "1228800" > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/hispeed_freq
-echo "90" > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/hispeed_load
-echo "0" > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/iowait_boost_enable
-echo "1" > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/pl
-echo "0" > /sys/devices/system/cpu/cpu0/cpufreq/schedutil/up_rate_limit_us
+echo "20000" > /sys/devices/system/cpu/cpu0/cpufreq/PIXEL_SMURFUTIL/down_rate_limit_us
+echo "0" > /sys/devices/system/cpu/cpu0/cpufreq/PIXEL_SMURFUTIL/hispeed_freq
+echo "90" > /sys/devices/system/cpu/cpu0/cpufreq/PIXEL_SMURFUTIL/hispeed_load
+echo "0" > /sys/devices/system/cpu/cpu0/cpufreq/PIXEL_SMURFUTIL/iowait_boost_enable
+echo "1" > /sys/devices/system/cpu/cpu0/cpufreq/PIXEL_SMURFUTIL/pl
+echo "500" > /sys/devices/system/cpu/cpu0/cpufreq/PIXEL_SMURFUTIL/up_rate_limit_us
 
 # GOLD Cluster Limiter
-echo "0" > /sys/devices/system/cpu/cpu4/cpufreq/schedutil/down_rate_limit_us
-echo "1536000" > /sys/devices/system/cpu/cpu4/cpufreq/schedutil/hispeed_freq
-echo "90" > /sys/devices/system/cpu/cpu4/cpufreq/schedutil/hispeed_load
-echo "0" > /sys/devices/system/cpu/cpu4/cpufreq/schedutil/iowait_boost_enable
-echo "1" > /sys/devices/system/cpu/cpu4/cpufreq/schedutil/pl
-echo "0" > /sys/devices/system/cpu/cpu4/cpufreq/schedutil/up_rate_limit_us
+echo "20000" > /sys/devices/system/cpu/cpu4/cpufreq/blu_schedutil/down_rate_limit_us
+echo "0" > /sys/devices/system/cpu/cpu4/cpufreq/blu_schedutil/hispeed_freq
+echo "90" > /sys/devices/system/cpu/cpu4/cpufreq/blu_schedutil/hispeed_load
+echo "0" > /sys/devices/system/cpu/cpu4/cpufreq/blu_schedutil/iowait_boost_enable
+echo "1" > /sys/devices/system/cpu/cpu4/cpufreq/blu_schedutil/pl
+echo "500" > /sys/devices/system/cpu/cpu4/cpufreq/blu_schedutil/up_rate_limit_us
 
 ################################################################################
 
@@ -77,17 +77,17 @@ echo "0" > /sys/devices/system/cpu/cpu4/cpufreq/schedutil/up_rate_limit_us
 ################################################################################
 
 # Low Freq
-echo "257000000" > /sys/class/kgsl/kgsl-3d0/devfreq/min_freq 
-echo "257000000" > /sys/class/kgsl/kgsl-3d0/min_gpuclk
+echo "180000000" > /sys/class/kgsl/kgsl-3d0/devfreq/min_freq 
+echo "180000000" > /sys/class/kgsl/kgsl-3d0/min_gpuclk
 
 # High Freq
-echo "820000000" > /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 
-echo "820000000" > /sys/class/kgsl/kgsl-3d0/max_gpuclk
+echo "710000000" > /sys/class/kgsl/kgsl-3d0/devfreq/max_freq 
+echo "710000000" > /sys/class/kgsl/kgsl-3d0/max_gpuclk
 
 # Limiter
-echo "0" > /sys/class/kgsl/kgsl-3d0/throttling
-echo "7" > /sys/class/kgsl/kgsl-3d0/default_pwrlevel
-echo "performance" > /sys/class/kgsl/kgsl-3d0/devfreq/governor
+echo "1" > /sys/class/kgsl/kgsl-3d0/throttling
+echo "8" > /sys/class/kgsl/kgsl-3d0/default_pwrlevel
+echo "msm-adreno-tz" > /sys/class/kgsl/kgsl-3d0/devfreq/governor
 
 ################################################################################
 
@@ -100,12 +100,12 @@ echo "performance" > /sys/class/kgsl/kgsl-3d0/devfreq/governor
 ################################################################################
 
 # IO Scheduler
-echo "fiops" > /sys/block/sda/queue/scheduler
-echo "fiops" > /sys/block/sdb/queue/scheduler
-echo "fiops" > /sys/block/sdc/queue/scheduler
-echo "fiops" > /sys/block/sdd/queue/scheduler
-echo "fiops" > /sys/block/sde/queue/scheduler
-echo "fiops" > /sys/block/sdf/queue/scheduler
+echo "zen" > /sys/block/sda/queue/scheduler
+echo "zen" > /sys/block/sdb/queue/scheduler
+echo "zen" > /sys/block/sdc/queue/scheduler
+echo "zen" > /sys/block/sdd/queue/scheduler
+echo "zen" > /sys/block/sde/queue/scheduler
+echo "zen" > /sys/block/sdf/queue/scheduler
 
 ################################################################################
 
@@ -121,19 +121,19 @@ echo "fiops" > /sys/block/sdf/queue/scheduler
 echo "2800000" > /sys/class/power_supply/battery/constant_charge_current_max
 
 # Power
-echo "N" > /sys/module/workqueue/parameters/power_efficient
+echo "Y" > /sys/module/workqueue/parameters/power_efficient
 
 # Thermals
-echo "10" > /sys/class/thermal/thermal_message/sconfig
+echo "-1" > /sys/class/thermal/thermal_message/sconfig
 
 # Scale down in low write load
 # That change tried to fix a problem for clock scaling during write requests.
 # The default value for it is "0" (favor for downscale).
 # For users who want performance over power they should set it to "1" (favor for upscale)
-write /sys/class/mmc_host/mmc0/clk_scaling/scale_down_in_low_wr_load 1
+write /sys/class/mmc_host/mmc0/clk_scaling/scale_down_in_low_wr_load 0
 
 # Panel Backlight
-write /sys/class/leds/lcd-backlight/max_brightness 255
+write /sys/class/leds/lcd-backlight/max_brightness 200
 
 ################################################################################
 
@@ -157,8 +157,8 @@ echo "2048,3072,11520,16640,24320,42240" > /sys/module/lowmemorykiller/parameter
 swapoff /dev/block/zram0
 echo 1 > /sys/block/zram0/reset
 echo 0 > /sys/block/zram0/disksize
-echo 536870912 > /sys/block/zram0/disksize
-echo 512M > /sys/block/zram0/mem_limit
+echo 1610612736 > /sys/block/zram0/disksize
+echo 1536M > /sys/block/zram0/mem_limit
 echo 8 > /sys/block/zram0/max_comp_streams
 mkswap /dev/block/zram0
 swapon /dev/block/zram0 -p 32758
