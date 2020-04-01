@@ -771,10 +771,10 @@ static ssize_t measured_fps_show(struct device *device,
 	struct drm_crtc *crtc;
 	struct sde_crtc *sde_crtc;
 	unsigned int fps_int, fps_decimal;
-	u64 fps = 0, frame_count = 1;
+	int fps = 0, frame_count = 1;
 	ktime_t current_time;
 	int i = 0, current_time_index;
-	u64 diff_us;
+	int diff_us;
 
 	if (!device || !buf) {
 		SDE_ERROR("invalid input param(s)\n");
