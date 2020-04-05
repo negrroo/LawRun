@@ -1091,9 +1091,7 @@ int dwc3_core_pre_init(struct dwc3 *dwc)
 		}
 	}
 
-	/* de-assert DRVVBUS for HOST and OTG mode */
-	dwc3_set_mode(dwc, DWC3_GCTL_PRTCAP_DEVICE);
-        return ret;
+	return ret;
 }
 
 #define DWC3_ALIGN_MASK		(16 - 1)
@@ -1285,8 +1283,6 @@ static int dwc3_probe(struct platform_device *pdev)
 					"snps,usb3-u1u2-disable");
 	dwc->usb2_l1_disable = device_property_read_bool(dev,
 					"snps,usb2-l1-disable");
-	dwc->normal_eps_in_gsi_mode = device_property_read_bool(dev,
-					"normal-eps-in-gsi-mode");
 	if (dwc->enable_bus_suspend) {
 		pm_runtime_set_autosuspend_delay(dev, 500);
 		pm_runtime_use_autosuspend(dev);
@@ -1674,3 +1670,4 @@ MODULE_ALIAS("platform:dwc3");
 MODULE_AUTHOR("Felipe Balbi <balbi@ti.com>");
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("DesignWare USB3 DRD Controller Driver");
+

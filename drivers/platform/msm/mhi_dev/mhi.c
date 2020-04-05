@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -28,7 +28,6 @@
 #include <linux/msm_ep_pcie.h>
 #include <linux/ipa_mhi.h>
 #include <linux/vmalloc.h>
-#include <soc/qcom/boot_stats.h>
 
 #include "mhi.h"
 #include "mhi_hwio.h"
@@ -45,6 +44,7 @@
 #define MHI_RING_PRIMARY_EVT_ID		1
 #define MHI_1K_SIZE			0x1000
 /* Updated Specification for event start is NER - 2 and end - NER -1 */
+#define MHI_HW_ACC_EVT_RING_START	3
 #define MHI_HW_ACC_EVT_RING_END		1
 
 #define MHI_HOST_REGION_NUM             2
@@ -63,10 +63,6 @@
 
 #define TR_RING_ELEMENT_SZ	sizeof(struct mhi_dev_transfer_ring_element)
 #define RING_ELEMENT_TYPE_SZ	sizeof(union mhi_dev_ring_element_type)
-
-#define MHI_DEV_CH_CLOSE_TIMEOUT_MIN	5000
-#define MHI_DEV_CH_CLOSE_TIMEOUT_MAX	5100
-#define MHI_DEV_CH_CLOSE_TIMEOUT_COUNT	30
 
 uint32_t bhi_imgtxdb;
 enum mhi_msg_level mhi_msg_lvl = MHI_MSG_ERROR;
@@ -310,7 +306,7 @@ static void mhi_dev_get_erdb_db_cfg(struct mhi_dev *mhi,
 		break;
 	default:
 		erdb_cfg->base = mhi->cfg.event_rings -
-					(mhi->cfg.hw_event_rings);
+					MHI_HW_ACC_EVT_RING_START;
 		erdb_cfg->end =  mhi->cfg.event_rings -
 					MHI_HW_ACC_EVT_RING_END;
 		break;
@@ -462,8 +458,6 @@ static void mhi_hwc_cb(void *priv, enum ipa_mhi_event_type event,
 		}
 
 		mhi_update_state_info(MHI_DEV_UEVENT_CTRL, MHI_STATE_CONNECTED);
-		mhi_log(MHI_MSG_CRITICAL, "Device in M0 State\n");
-		place_marker("MHI - Device in M0 State\n");
 
 		if (!mhi_ctx->mhi_int)
 			ep_pcie_mask_irq_event(mhi_ctx->phandle,
@@ -502,32 +496,17 @@ static int mhi_hwc_chcmd(struct mhi_dev *mhi, uint chid,
 	case MHI_DEV_RING_EL_START:
 		connect_params.channel_id = chid;
 		connect_params.sys.skip_ep_cfg = true;
-
-		switch (chid) {
-		case MHI_CLIENT_ADPL_IN:
+		if (chid == MHI_CLIENT_ADPL_IN)
 			connect_params.sys.client = IPA_CLIENT_MHI_DPL_CONS;
-			break;
-		case MHI_CLIENT_IP_HW_0_OUT:
+		else if ((chid % 2) == 0x0)
 			connect_params.sys.client = IPA_CLIENT_MHI_PROD;
-			break;
-		case MHI_CLIENT_IP_HW_0_IN:
+		else
 			connect_params.sys.client = IPA_CLIENT_MHI_CONS;
-			break;
-		case MHI_CLIENT_IP_HW_1_OUT:
-			connect_params.sys.client = IPA_CLIENT_MHI2_PROD;
-			break;
-		case MHI_CLIENT_IP_HW_1_IN:
-			connect_params.sys.client = IPA_CLIENT_MHI2_CONS;
-			break;
-		default:
-			pr_err("Invalid channel = 0x%X\n", chid);
-			return -EINVAL;
-		}
 
 		rc = ipa_mhi_connect_pipe(&connect_params,
 			&mhi->ipa_clnt_hndl[chid-HW_CHANNEL_BASE]);
 		if (rc)
-			pr_err("HW Channel%d start failed : %d\n",
+			pr_err("HW Channel%d start failed 0x%X\n",
 							chid, rc);
 		break;
 	case MHI_DEV_RING_EL_INVALID:
@@ -920,7 +899,7 @@ static int mhi_dev_process_stop_cmd(struct mhi_dev_ring *ring, uint32_t ch_id,
 		return 0;
 	} else if (mhi->ch_ctx_cache[ch_id].ch_type ==
 			MHI_DEV_CH_TYPE_INBOUND_CHANNEL &&
-			(mhi->ch[ch_id].pend_wr_count > 0)) {
+			mhi->ch[ch_id].wr_request_active) {
 		mhi_log(MHI_MSG_INFO, "Pending inbound transaction\n");
 		return 0;
 	}
@@ -1460,22 +1439,8 @@ static void mhi_dev_transfer_completion_cb(void *mreq)
 	rd_offset = req->rd_offset;
 	ch->curr_ereq->context = ch;
 
-	if (mhi->ch_ctx_cache[ch->ch_id].ch_type ==
-			MHI_DEV_CH_TYPE_INBOUND_CHANNEL)
-		ch->pend_wr_count--;
-
 	dma_unmap_single(&mhi_ctx->pdev->dev, req->dma,
 			req->len, DMA_FROM_DEVICE);
-
-	/*
-	 * Channel got closed with transfers pending
-	 * Do not trigger callback or send cmpl to host
-	 */
-	if (ch->state == MHI_DEV_CH_CLOSED) {
-		mhi_log(MHI_MSG_DBG, "Ch %d closed with %d writes pending\n",
-				ch->ch_id, ch->pend_wr_count + 1);
-		return;
-	}
 
 	/* Trigger client call back */
 	req->client_cb(req);
@@ -2030,61 +1995,25 @@ int mhi_dev_channel_isempty(struct mhi_dev_client *handle)
 }
 EXPORT_SYMBOL(mhi_dev_channel_isempty);
 
-bool mhi_dev_channel_has_pending_write(struct mhi_dev_client *handle)
+void mhi_dev_close_channel(struct mhi_dev_client *handle)
 {
 	struct mhi_dev_channel *ch;
 
 	if (!handle) {
-		mhi_log(MHI_MSG_ERROR, "Invalid channel access\n");
-		return -EINVAL;
+		mhi_log(MHI_MSG_ERROR, "Invalid channel access:%d\n", -ENODEV);
+		return;
 	}
 
 	ch = handle->channel;
-	if (!ch)
-		return -EINVAL;
-
-	return ch->pend_wr_count ? true : false;
-}
-EXPORT_SYMBOL(mhi_dev_channel_has_pending_write);
-
-int mhi_dev_close_channel(struct mhi_dev_client *handle)
-{
-	struct mhi_dev_channel *ch;
-	int count = 0;
-	int rc = 0;
-
-	ch = handle->channel;
-
-	do {
-		if (ch->pend_wr_count) {
-			usleep_range(MHI_DEV_CH_CLOSE_TIMEOUT_MIN,
-					MHI_DEV_CH_CLOSE_TIMEOUT_MAX);
-		} else
-			break;
-	} while (++count < MHI_DEV_CH_CLOSE_TIMEOUT_COUNT);
 
 	mutex_lock(&ch->ch_lock);
 
-	if (ch->pend_wr_count)
-		mhi_log(MHI_MSG_ERROR, "%d writes pending for channel %d\n",
-			ch->pend_wr_count, ch->ch_id);
-
-	if (ch->state != MHI_DEV_CH_PENDING_START) {
+	if (ch->state != MHI_DEV_CH_PENDING_START)
 		if ((ch->ch_type == MHI_DEV_CH_TYPE_OUTBOUND_CHANNEL &&
-			!mhi_dev_channel_isempty(handle)) || ch->tre_loc) {
+			!mhi_dev_channel_isempty(handle)) || ch->tre_loc)
 			mhi_log(MHI_MSG_DBG,
 				"Trying to close an active channel (%d)\n",
 				ch->ch_id);
-			rc = -EAGAIN;
-			goto exit;
-		} else if (ch->tre_loc) {
-			mhi_log(MHI_MSG_ERROR,
-				"Trying to close channel (%d) when a TRE is active",
-				ch->ch_id);
-			rc = -EAGAIN;
-			goto exit;
-		}
-	}
 
 	ch->state = MHI_DEV_CH_CLOSED;
 	ch->active_client = NULL;
@@ -2093,9 +2022,9 @@ int mhi_dev_close_channel(struct mhi_dev_client *handle)
 	ch->ereqs = NULL;
 	ch->tr_events = NULL;
 	kfree(handle);
-exit:
+
 	mutex_unlock(&ch->ch_lock);
-	return rc;
+	return;
 }
 EXPORT_SYMBOL(mhi_dev_close_channel);
 
@@ -2289,7 +2218,6 @@ int mhi_dev_write_channel(struct mhi_req *wreq)
 	size_t bytes_to_write = 0;
 	size_t bytes_written = 0;
 	uint32_t tre_len = 0, suspend_wait_timeout = 0;
-	bool async_wr_sched = false;
 
 	if (!wreq || !wreq->client || !wreq->buf) {
 		pr_err("%s: invalid parameters\n", __func__);
@@ -2333,12 +2261,12 @@ int mhi_dev_write_channel(struct mhi_req *wreq)
 
 	handle_client = wreq->client;
 	ch = handle_client->channel;
+	ch->wr_request_active = true;
 
 	ring = ch->ring;
 
 	mutex_lock(&ch->ch_lock);
 
-	ch->pend_wr_count++;
 	if (ch->state == MHI_DEV_CH_STOPPED) {
 		mhi_log(MHI_MSG_ERROR,
 			"channel %d already stopped\n", wreq->chan);
@@ -2389,8 +2317,7 @@ int mhi_dev_write_channel(struct mhi_req *wreq)
 					"Error while writing chan (%d) rc %d\n",
 					wreq->chan, rc);
 			goto exit;
-		} else if (wreq->mode == DMA_ASYNC)
-			async_wr_sched = true;
+		}
 		bytes_written += bytes_to_write;
 		usr_buf_remaining -= bytes_to_write;
 
@@ -2430,8 +2357,7 @@ int mhi_dev_write_channel(struct mhi_req *wreq)
 		}
 	}
 exit:
-	if (wreq->mode == DMA_SYNC || !async_wr_sched)
-		ch->pend_wr_count--;
+	ch->wr_request_active = false;
 	mutex_unlock(&ch->ch_lock);
 	mutex_unlock(&mhi_ctx->mhi_write_test);
 	return bytes_written;
@@ -3275,3 +3201,4 @@ module_exit(mhi_dev_exit);
 
 MODULE_DESCRIPTION("MHI device driver");
 MODULE_LICENSE("GPL v2");
+

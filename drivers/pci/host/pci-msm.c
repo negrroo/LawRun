@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -517,7 +517,6 @@ struct msm_pcie_dev_t {
 	struct platform_device	 *pdev;
 	struct pci_dev *dev;
 	struct regulator *gdsc;
-	struct regulator *vreg_pcie;
 	struct regulator *gdsc_smmu;
 	struct msm_pcie_vreg_info_t  vreg[MSM_PCIE_MAX_VREG];
 	struct msm_pcie_gpio_info_t  gpio[MSM_PCIE_MAX_GPIO];
@@ -3425,18 +3424,6 @@ static int msm_pcie_get_resources(struct msm_pcie_dev_t *dev,
 		}
 	}
 
-	dev->vreg_pcie = devm_regulator_get(&pdev->dev, "vreg-pcie");
-
-	if (IS_ERR(dev->vreg_pcie)) {
-		PCIE_ERR(dev, "PCIe: RC%d Failed to get %s VREG_PCIE:%ld\n",
-			dev->rc_idx, dev->pdev->name, PTR_ERR(dev->gdsc));
-		if (PTR_ERR(dev->vreg_pcie) == -EPROBE_DEFER)
-			PCIE_DBG(dev, "PCIe: EPROBE_DEFER for %s VREG_PCIE\n",
-					dev->pdev->name);
-		ret = PTR_ERR(dev->vreg_pcie);
-		goto out;
-	}
-
 	dev->gdsc = devm_regulator_get(&pdev->dev, "gdsc-vdd");
 
 	if (IS_ERR(dev->gdsc)) {
@@ -3773,7 +3760,7 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 
 	/* assert PCIe reset link to keep EP in reset */
 
-	PCIE_DBG(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
+	PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
 		dev->rc_idx);
 	gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
 				dev->gpio[MSM_PCIE_GPIO_PERST].on);
@@ -3896,7 +3883,7 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 		dev->rc_idx, retries);
 
 	if (pcie_phy_is_ready(dev))
-		PCIE_DBG(dev, "PCIe RC%d PHY is ready!\n", dev->rc_idx);
+		PCIE_INFO(dev, "PCIe RC%d PHY is ready!\n", dev->rc_idx);
 	else {
 		PCIE_ERR(dev, "PCIe PHY RC%d failed to come up!\n",
 			dev->rc_idx);
@@ -3914,7 +3901,7 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 
 	/* de-assert PCIe reset link to bring EP out of reset */
 
-	PCIE_DBG(dev, "PCIe: Release the reset of endpoint of RC%d.\n",
+	PCIE_INFO(dev, "PCIe: Release the reset of endpoint of RC%d.\n",
 		dev->rc_idx);
 	gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
 				1 - dev->gpio[MSM_PCIE_GPIO_PERST].on);
@@ -3959,9 +3946,9 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 		msm_pcie_confirm_linkup(dev, false, false, NULL)) {
 		PCIE_DBG(dev, "Link is up after %d checkings\n",
 			link_check_count);
-		PCIE_DBG(dev, "PCIe RC%d link initialized\n", dev->rc_idx);
+		PCIE_INFO(dev, "PCIe RC%d link initialized\n", dev->rc_idx);
 	} else {
-		PCIE_DBG(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
+		PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
 			dev->rc_idx);
 		gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
 			dev->gpio[MSM_PCIE_GPIO_PERST].on);
@@ -4065,7 +4052,7 @@ static void msm_pcie_disable(struct msm_pcie_dev_t *dev, u32 options)
 	dev->power_on = false;
 	dev->link_turned_off_counter++;
 
-	PCIE_DBG(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
+	PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
 		dev->rc_idx);
 
 	gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
@@ -4302,19 +4289,6 @@ int msm_pcie_enumerate(u32 rc_idx)
 	}
 
 	if (!dev->enumerated) {
-
-		/*Open the PCIE VCC before enable the pcie */
-		if (dev->vreg_pcie) {
-			ret = regulator_enable(dev->vreg_pcie);
-
-			if (ret) {
-				PCIE_ERR(dev,
-					"PCIe: fail to open vcc for RC%d (%s)\n",
-				dev->rc_idx, dev->pdev->name);
-				return ret;
-			}
-		}
-
 		ret = msm_pcie_enable(dev, PM_ALL);
 
 		/* kick start ARM PCI configuration framework */
@@ -5548,7 +5522,7 @@ static void msm_pcie_config_link_pm_rc(struct msm_pcie_dev_t *dev,
 {
 	bool child_l0s_enable = 0, child_l1_enable = 0, child_l1ss_enable = 0;
 
-	if (!pdev->subordinate || list_empty(&pdev->subordinate->devices)) {
+	if (!pdev->subordinate || !(&pdev->subordinate->devices)) {
 		PCIE_DBG(dev,
 			"PCIe: RC%d: no device connected to root complex\n",
 			dev->rc_idx);
@@ -6134,15 +6108,6 @@ static int msm_pcie_remove(struct platform_device *pdev)
 	msm_pcie_clk_deinit(&msm_pcie_dev[rc_idx]);
 	msm_pcie_gpio_deinit(&msm_pcie_dev[rc_idx]);
 	msm_pcie_release_resources(&msm_pcie_dev[rc_idx]);
-
-	/*Close the PCIE VCC  when remove the pcie*/
-	if (msm_pcie_dev[rc_idx].vreg_pcie) {
-		ret = regulator_disable(msm_pcie_dev[rc_idx].vreg_pcie);
-
-		if (ret)
-			pr_err("%s: PCIe: fail to close VCC.\n", __func__);
-
-	}
 
 out:
 	mutex_unlock(&pcie_drv.drv_lock);

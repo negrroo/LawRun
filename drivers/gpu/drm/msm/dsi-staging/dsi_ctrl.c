@@ -124,7 +124,7 @@ static ssize_t debugfs_state_info_read(struct file *file,
 	if (len > count)
 		len = count;
 
-	len = min_t(size_t, len, SZ_4K);
+	/* TODO: make sure that this does not exceed 4K */
 	if (copy_to_user(buff, buf, len)) {
 		kfree(buf);
 		return -EFAULT;
@@ -182,7 +182,7 @@ static ssize_t debugfs_reg_dump_read(struct file *file,
 	if (len > count)
 		len = count;
 
-	len = min_t(size_t, len, SZ_4K);
+	/* TODO: make sure that this does not exceed 4K */
 	if (copy_to_user(buff, buf, len)) {
 		kfree(buf);
 		return -EFAULT;
@@ -3505,3 +3505,4 @@ void dsi_ctrl_drv_unregister(void)
 {
 	platform_driver_unregister(&dsi_ctrl_driver);
 }
+

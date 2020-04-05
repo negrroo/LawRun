@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2017, 2019-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2017, 2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,7 +37,7 @@ enum {
 	SOCKET_ADSP,
 	SOCKET_WCNSS,
 	SOCKET_SLPI,
-	SOCKET_CDSP = 5,
+	SOCKET_CDSP,
 	SOCKET_APPS,
 	NUM_SOCKET_SUBSYSTEMS,
 };
@@ -109,3 +109,4 @@ void diag_socket_early_exit(void);
 void diag_socket_invalidate(void *ctxt, struct diagfwd_info *fwd_ctxt);
 int diag_socket_check_state(void *ctxt);
 #endif
+
