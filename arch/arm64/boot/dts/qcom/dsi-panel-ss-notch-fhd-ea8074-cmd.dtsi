@@ -38,7 +38,7 @@
 		qcom,mdss-dsi-lane-1-state;
 		qcom,mdss-dsi-lane-2-state;
 		qcom,mdss-dsi-lane-3-state;
-		qcom,mdss-brightness-max-level = <255>;
+		qcom,mdss-brightness-max-level = <1023>;
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-bl-dcs-type-ss;
@@ -56,7 +56,7 @@
 		qcom,mdss-dsi-panel-hdr-enabled;
 		qcom,mdss-dsi-panel-hdr-color-primaries = <14500 15500 32000
 			17000 15500 30000 8000 3000>;
-		qcom,mdss-dsi-panel-peak-brightness = <5530000>;
+		qcom,mdss-dsi-panel-peak-brightness = <4300000>;
 		qcom,mdss-dsi-panel-blackness-level = <3230>;
 		qcom,dispparam-enabled;
 		qcom,mdss-dsi-init-delay-us = <5000>;
