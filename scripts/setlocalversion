@@ -106,7 +106,7 @@ scm_version()
 		# Are there uncommitted changes?
 		# These are represented by + after the changeset id.
 		case "$hgid" in
-			*+|*+\ *) printf '%s';;
+			*+|*+\ *) printf '%s' -dirty ;;
 		esac
 
 		# All done with mercurial
@@ -175,6 +175,7 @@ else
 	# LOCALVERSION= is not specified
 	if test "${LOCALVERSION+set}" != "set"; then
 		scm=$(scm_version --short)
+		res="$res${scm:++}"
 	fi
 fi
 

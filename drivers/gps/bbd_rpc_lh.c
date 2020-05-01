@@ -1,6 +1,6 @@
 /*
  * Copyright 2015 Broadcom Corporation
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2, as
@@ -32,8 +32,11 @@
 #include <linux/printk.h>
 #include "bbd.h"
 
+
 ssize_t bbd_sensor_write(const char *buf, unsigned int size);
+void bcm_on_packet_received(void *_priv, unsigned char *data, size_t size);
 #else
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,39 +67,39 @@ ssize_t bbd_sensor_write(const unsigned char *buf, size_t size)
 * Note that you can also define these value from your makefile directly
 */
 
-/// if defined to 1, the reliable channel will be enabled.
-//  If defined to 0, it
-//  will be disabled and compiled out
+
+
+
 #ifndef TLCUST_ENABLE_RELIABLE_PL
 	#define TLCUST_ENABLE_RELIABLE_PL 1
 #endif
 
-// Defines the max size of outgoing packet.
-// That should match the max size of incoming packet from the remote TL
+
+
 #ifndef TLCUST_MAX_OUTGOING_PACKET_SIZE
 	#define TLCUST_MAX_OUTGOING_PACKET_SIZE 2048
 #endif
 
-// Defines the max size of incoming packet. That should match
-// the max size of outgoing packet from the remote TL
+
+
 #ifndef TLCUST_MAX_INCOMING_PACKET_SIZE
 	#define TLCUST_MAX_INCOMING_PACKET_SIZE 2048
 #endif
 
-// Defines the number of millisecond before retrying a reliable
-// packet when no acknowledgment is received.
+
+
 #ifndef TLCUST_RELIABLE_RETRY_TIMEOUT_MS
 	#define TLCUST_RELIABLE_RETRY_TIMEOUT_MS 1000
 #endif
 
-// Defines the number of retries before declaring a communication error
+
 #ifndef TLCUST_RELIABLE_MAX_RETRY
 	#define TLCUST_RELIABLE_MAX_RETRY 10
 #endif
 
 
-// Defines the maximum number of reliable packets
-// that can be in transit(MAX is 255)
+
+
 #ifndef TLCUST_RELIABLE_MAX_PACKETS
 	#define TLCUST_RELIABLE_MAX_PACKETS 150
 #endif
@@ -134,37 +137,37 @@ static const unsigned char ESCAPED_XOFF_CHARACTER   = 0x05;
  * The following are the bit field definition for the flags
  */
 static const unsigned short FLAG_PACKET_ACK      = (1<<0);
-// ACK of a received packet. Flag detail contains the ACK SeqId
+
 static const unsigned short FLAG_RELIABLE_PACKET = (1<<1);
-// Indicates that this is a reliable packet. Flag detail contains
-// the remote reliable seqId
+
+
 static const unsigned short FLAG_RELIABLE_ACK    = (1<<2);
-// A reliable SeqId was Acked. Flag detail
-// contains the acked reliable seqId
+
+
 static const unsigned short FLAG_RELIABLE_NACK   = (1<<3);
-// A reliable SeqId error was detected.
-//Flag detail contains the last remote reliable seqId
+
+
 
 
 
 static const unsigned short FLAG_MSG_LOST        = (1<<4);
-// Remote PacketLayer detected lost packets (jumps in SeqId).
-//The flag details contains the last remote seqId
+
+
 static const unsigned short FLAG_MSG_GARBAGE     = (1<<5);
-// Garbage bytes detected. The Flag details will contains
-//the number of garbage bytes (capped to 255)
+
+
 static const unsigned short FLAG_SIZE_EXTENDED   = (1<<6);
-// Size of packet will have one byte
-//extension (MSB), contained in the Flags detail
+
+
 static const unsigned short FLAG_EXTENDED        = (1<<7);
-// If set, then the flag details will contains
-// a Byte representing the MSB of the 16bit flags
+
+
 static const unsigned short FLAG_INTERNAL_PACKET = (1<<8);
-// Packet in that message is internal,
-// and should be processed by the TL
+
+
 static const unsigned short FLAG_IGNORE_SEQID    = (1<<9);
-// Remote side requested to ignore the seqId,
-//i.e. error should not be accounted for in the stats
+
+
 
 /* Enumeration of all the RPCs for the codec. DO NOT CHANGE THE ORDER,
  * DELETE, or INSERT anything to keep backward compatibility.
@@ -219,7 +222,7 @@ enum {
 	, RPC_DEFINITION(IRpcSensorResponse, Data)
 };
 
-/// enumeration for the state
+
 enum {
 	WAIT_FOR_ESC_SOP = 0
 		, WAIT_FOR_SOP
@@ -232,11 +235,11 @@ typedef struct stTransportLayerStats {
 	unsigned int ulRxGarbageBytes;
 	unsigned int ulRxPacketLost;
 	unsigned int ulRemotePacketLost;
-	// this is approximate as it is reported and the report could be lost.
+
 	unsigned int ulRemoteGarbage;
-	// this is approximate as it is reported and the report could be lost.
+
 	unsigned int ulPacketSent;
-	// number of normal packet sent
+
 	unsigned int ulPacketReceived;
 	unsigned int ulAckReceived;
 	unsigned int ulReliablePacketSent;
@@ -264,6 +267,30 @@ static unsigned char m_ucReliableSeqId;
 static unsigned char m_ucReliableCrc;
 static unsigned short m_usReliableLen;
 static bool m_bOngoingSync;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /**
  * CRC table - from GlUtlCrc::ucCrcTable
@@ -306,6 +333,7 @@ static const unsigned char crc_table[] = {
 
 static inline unsigned char crc_calc(unsigned char *m_ucCrcState,
 									 unsigned char ucData)
+
 {
 	*m_ucCrcState = crc_table[*m_ucCrcState ^ ucData];
 	return *m_ucCrcState;
@@ -422,6 +450,7 @@ static int BbdBridge_OnPacketReceived(unsigned char *pucData,
 	} else {
 		WARN_ON(1);
 	}
+
 	return (sensor > 0);
 }
 
@@ -554,10 +583,9 @@ static bool TransportLayer_PacketReceived(void *priv)
 			if (!bAckReceived || usLen > 0) {
 				bool bDelayedEnough = (++m_ucDelayAckCount > 200);
 				++m_otCurrentStats.ulPacketReceived;
-				/* if this is a payload packet, we need to acknowledge it.
-				 * But don't clog the wires with power-hungry simple
-				 * acks unless we have too many (200) outstanding.
-				 */
+
+
+
 				if (bDelayedEnough) {
 					pr_debug("Skip averted/%d %s %s\n", __LINE__,
 							(bAckReceived) ? "ACK"  : "!ack",
@@ -625,6 +653,7 @@ static bool TransportLayer_PacketReceived(void *priv)
 							bcm_on_packet_received(priv, m_aucRxEscapedBuf, m_uiEscLen);
 					}
 				} else {
+
 						bcm_on_packet_received(priv, m_aucRxEscapedBuf, m_uiEscLen);
 				}
 				return true;
@@ -666,8 +695,8 @@ void bbd_parse_asic_data(unsigned char *pucData,
 						m_uiParserState = WAIT_FOR_SOP;
 						m_otCurrentStats.ulRxGarbageBytes +=
 							(m_ulByteCntSinceLastValidPacket - 1);
-						// if we had only one byte, then there is
-						// no garbage, any extra is garbage
+
+
 						m_ulByteCntSinceLastValidPacket = 1;
 					}
 				}
@@ -707,6 +736,7 @@ void bbd_parse_asic_data(unsigned char *pucData,
 					if (ucData == EOP_CHARACTER) {
 						if (TransportLayer_PacketReceived(priv)) {
 							m_ulByteCntSinceLastValidPacket = 0;
+
 						}
 						m_uiEscLen = 0;
 						m_uiParserState = WAIT_FOR_ESC_SOP;
@@ -732,12 +762,17 @@ void bbd_parse_asic_data(unsigned char *pucData,
 							m_uiParserState = WAIT_FOR_ESC_SOP;
 						}
 					} else if (ucData == (SOP_CHARACTER - 1)) {
+
+
 						m_uiParserState = WAIT_FOR_MESSAGE_COMPLETE;
+
 						m_uiRxLen = 0;
 						m_uiEscLen = 0;
 
 						m_otCurrentStats.ulRxGarbageBytes +=
 							(m_ulByteCntSinceLastValidPacket-2);
+
+
 						m_ulByteCntSinceLastValidPacket = 2;
 					} else if (ucData == ESCAPE_CHARACTER) {
 						m_uiParserState = WAIT_FOR_SOP;
@@ -757,6 +792,8 @@ EXPORT_SYMBOL(bbd_parse_asic_data);
 
 
 #ifndef __KERNEL__
+
+
 unsigned char sample1[] = { 0x00, 0x2E, 0xB0, 0x00, 0x85, 0x26,
 							0x00, 0x21, 0x24, 0x22, 0x00, 0x02,
 							0x00, 0x1E, 0x00, 0x37, 0x0E, 0xD3,
@@ -769,6 +806,7 @@ unsigned char sample1[] = { 0x00, 0x2E, 0xB0, 0x00, 0x85, 0x26,
 
 int main(void)
 {
+
 	bbd_parse_asic_data(sample1, sizeof(sample1), NULL, NULL);
 	return 0;
 }

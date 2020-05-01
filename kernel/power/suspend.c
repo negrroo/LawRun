@@ -54,8 +54,6 @@ void freeze_set_ops(const struct platform_freeze_ops *ops)
 	unlock_system_sleep();
 }
 
-extern void thaw_fingerprintd(void);
-
 static void freeze_begin(void)
 {
 	suspend_freeze_state = FREEZE_STATE_NONE;
@@ -410,8 +408,6 @@ static int suspend_enter(suspend_state_t state, bool *wakeup)
 	enable_nonboot_cpus();
 
  Platform_wake:
- 	thaw_fingerprintd();
-
 	platform_resume_noirq(state);
 	dpm_resume_noirq(PMSG_RESUME);
 

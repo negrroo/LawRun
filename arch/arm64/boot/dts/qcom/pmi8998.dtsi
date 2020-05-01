@@ -285,7 +285,6 @@
 			qcom,fg-esr-timer-asleep = <256 256>;
 			qcom,fg-esr-timer-charging = <0 96>;
 			qcom,cycle-counter-en;
-			qcom,hold-soc-while-full;
 			qcom,fg-auto-recharge-soc;
 			qcom,fg-recharge-soc-thr = <98>;
 			status = "okay";
@@ -876,7 +875,6 @@
 		polling-delay = <0>;
 		thermal-sensors = <&pmi8998_tz>;
 		wake-capable-sensor;
-		disable-thermal-zone;
 
 		trips {
 			pmi8998_trip0: pmi8998-trip0 {

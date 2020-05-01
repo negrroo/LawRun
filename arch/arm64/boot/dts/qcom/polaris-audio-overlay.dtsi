@@ -33,7 +33,6 @@
 		"MIC BIAS4", "Analog Mic5";
 
 	qcom,wsa-max-devs = <0>;
-	qcom,euro-us-hw-auto-switch;
 	qcom,hw-auto-sw-en-gpio = <&sbu_mic_oe>;
 	qcom,uart-audio-sw-gpio = <&sbu_uart_en>;
 	qcom,adc2-switch-gpio = <&adc2_switch_gpio>;

@@ -1,7 +1,6 @@
 /*
 ** =============================================================================
 ** Copyright (c) 2016  Texas Instruments Inc.
-** Copyright (C) 2019 XiaoMi, Inc.
 **
 ** This program is free software; you can redistribute it and/or modify it under
 ** the terms of the GNU General Public License as published by the Free Software
@@ -196,6 +195,7 @@ static ssize_t tas2559_file_read(struct file *file, char *buf, size_t count, lof
 					ret = copy_to_user(buf, p_kBuf, count);
 
 					if (ret != 0) {
+						/* Failed to copy all the data, exit */
 						dev_err(pTAS2559->dev, "copy to user fail %d\n", ret);
 					}
 
@@ -338,8 +338,10 @@ static ssize_t tas2559_file_write(struct file *file, const char *buf, size_t cou
 
 	p_kBuf = kzalloc(count, GFP_KERNEL);
 
-	if (p_kBuf == NULL)
+	if (p_kBuf == NULL) {
+		dev_err(pTAS2559->dev, "write no mem\n");
 		goto err;
+	}
 
 	ret = copy_from_user(p_kBuf, buf, count);
 
@@ -395,6 +397,13 @@ static ssize_t tas2559_file_write(struct file *file, const char *buf, size_t cou
 			dev_err(pTAS2559->dev, "read len fail.\n");
 
 		break;
+
+	case TIAUDIO_CMD_DEBUG_ON: {
+		if (count == 2)
+			g_logEnable = p_kBuf[1];
+
+		pTAS2559->mnDBGCmd = 0;
+	}
 	break;
 
 	case TIAUDIO_CMD_PROGRAM: {

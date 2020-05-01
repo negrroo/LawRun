@@ -114,7 +114,7 @@
  * Report Pressure in multitouch
  * 1:enable(default),0:disable
 */
-#define FTS_REPORT_PRESSURE_EN                  0
+#define FTS_REPORT_PRESSURE_EN                  1
 
 /*
  * Gesture function enable
@@ -127,12 +127,6 @@
  * default: disable
  */
 #define FTS_ESDCHECK_EN                         0
-
-/*
- * Production test enable
- * 1: enable, 0:disable(default)
- */
-#define FTS_TEST_EN                             1
 
 /*
  * Glove mode enable
@@ -148,7 +142,7 @@
  * Charger enable
  * 1: enable, 0:disable(default)
  */
-#define FTS_CHARGER_EN                          1
+#define FTS_CHARGER_EN                          0
 
 /*
  * Nodes for tools, please keep enable
@@ -187,8 +181,7 @@
  * 0:No check vendor_id (default)
  * 1/2/3: Check vendor_id for vendor compatibility
  */
-#define FTS_PROJECT_NAME                       "e10"
-#define FTS_PROJECT_NAME1                      "e5"
+#define FTS_GET_VENDOR_ID_NUM                   0
 
 /*
  * vendor_id(s) for vendor(s) to be compatible with.
@@ -208,8 +201,7 @@
  * define your own fw_file, the sample one to be replaced is invalid
  * NOTE: if FTS_GET_VENDOR_ID_NUM > 1, it's the fw corresponding with FTS_VENDOR_ID
  */
-#define FTS_UPGRADE_FW_FILE_E10                     "include/firmware/fw_ft8719_e10.i"
-#define FTS_UPGRADE_FW_FILE_E5                      "include/firmware/fw_ft3518_e5.i"
+#define FTS_UPGRADE_FW_FILE                      "include/firmware/fw_ft8719_e10.i"
 
 /*
  * if FTS_GET_VENDOR_ID_NUM >= 2, fw corrsponding with FTS_VENDOR_ID2

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1235,7 +1235,7 @@ enum hdd_tsf_op_result hdd_netbuf_timestamp(qdf_nbuf_t netbuf,
 		if (!ret) {
 			hwtstamps.hwtstamp = soc_time;
 			*skb_hwtstamps(netbuf) = hwtstamps;
-			netbuf->tstamp = 0;
+			netbuf->tstamp = ktime_set(0, 0);
 			return HDD_TSF_OP_SUCC;
 		}
 	}
@@ -1324,7 +1324,7 @@ int hdd_rx_timestamp(qdf_nbuf_t netbuf, uint64_t target_time)
 		return 0;
 
 	/* reset tstamp when failed */
-	netbuf->tstamp = 0;
+	netbuf->tstamp = ktime_set(0, 0);
 	return -EINVAL;
 }
 
@@ -1760,7 +1760,7 @@ void wlan_hdd_tsf_init(struct hdd_context *hdd_ctx)
 	status = hdd_tsf_set_gpio(hdd_ctx);
 
 	if (QDF_STATUS_SUCCESS != status) {
-		hdd_err("set tsf GPIO failed, status: %d", status);
+		hdd_debug("set tsf GPIO failed, status: %d", status);
 		goto fail;
 	}
 

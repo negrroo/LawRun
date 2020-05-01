@@ -152,27 +152,28 @@ int dwc3_gadget_set_link_state(struct dwc3 *dwc, enum dwc3_link_state state)
 
 /**
  * dwc3_ep_inc_trb() - Increment a TRB index.
+ * @dep - DWC3 endpoint
  * @index - Pointer to the TRB index to increment.
  *
  * The index should never point to the link TRB. After incrementing,
  * if it is point to the link TRB, wrap around to the beginning. The
  * link TRB is always at the last TRB entry.
  */
-static void dwc3_ep_inc_trb(u8 *index)
+static void dwc3_ep_inc_trb(struct dwc3_ep *dep, u8 *index)
 {
 	(*index)++;
-	if (*index == (DWC3_TRB_NUM - 1))
+	if (*index == (dep->num_trbs - 1))
 		*index = 0;
 }
 
 void dwc3_ep_inc_enq(struct dwc3_ep *dep)
 {
-	dwc3_ep_inc_trb(&dep->trb_enqueue);
+	dwc3_ep_inc_trb(dep, &dep->trb_enqueue);
 }
 
 void dwc3_ep_inc_deq(struct dwc3_ep *dep)
 {
-	dwc3_ep_inc_trb(&dep->trb_dequeue);
+	dwc3_ep_inc_trb(dep, &dep->trb_dequeue);
 }
 
 /*
@@ -744,6 +745,21 @@ static void dwc3_remove_requests(struct dwc3 *dwc, struct dwc3_ep *dep)
 
 		dwc3_gadget_giveback(dep, req, -ESHUTDOWN);
 	}
+
+	if (dep->number == 1 && dwc->ep0state != EP0_SETUP_PHASE) {
+		unsigned int dir;
+
+		dbg_log_string("CTRLPEND %d", dwc->ep0state);
+		dir = !!dwc->ep0_expect_in;
+		if (dwc->ep0state == EP0_DATA_PHASE)
+			dwc3_ep0_end_control_data(dwc, dwc->eps[dir]);
+		else
+			dwc3_ep0_end_control_data(dwc, dwc->eps[!dir]);
+
+		dwc->eps[0]->trb_enqueue = 0;
+		dwc->eps[1]->trb_enqueue = 0;
+	}
+
 	dbg_log_string("DONE for %s(%d)", dep->name, dep->number);
 }
 
@@ -1952,6 +1968,11 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on, int suspend)
 		reg1 |= DWC3_GEVNTSIZ_INTMASK;
 		dwc3_writel(dwc->regs, DWC3_GEVNTSIZ(0), reg1);
 
+		/*
+		 * Reset the err_evt_seen so that the interrupts on
+		 * next connect/session is processed correctly.
+		 */
+		dwc->err_evt_seen = false;
 		dwc->pullups_connected = false;
 
 		__dwc3_gadget_ep_disable(dwc->eps[0]);
@@ -2388,8 +2409,8 @@ static const struct usb_gadget_ops dwc3_gadget_ops = {
 
 /* -------------------------------------------------------------------------- */
 
-#define NUM_GSI_OUT_EPS	1
-#define NUM_GSI_IN_EPS	2
+#define NUM_GSI_OUT_EPS(dwc)	(dwc->normal_eps_in_gsi_mode ? 2 : 1)
+#define NUM_GSI_IN_EPS(dwc)	(dwc->normal_eps_in_gsi_mode ? 3 : 2)
 
 static int dwc3_gadget_init_hw_endpoints(struct dwc3 *dwc,
 		u8 num, u32 direction)
@@ -2397,13 +2418,13 @@ static int dwc3_gadget_init_hw_endpoints(struct dwc3 *dwc,
 	struct dwc3_ep			*dep;
 	u8				i, gsi_ep_count, gsi_ep_index = 0;
 
-	gsi_ep_count = NUM_GSI_OUT_EPS + NUM_GSI_IN_EPS;
+	gsi_ep_count = NUM_GSI_OUT_EPS(dwc) + NUM_GSI_IN_EPS(dwc);
 	/* OUT GSI EPs based on direction field */
 	if (gsi_ep_count && !direction)
-		gsi_ep_count = NUM_GSI_OUT_EPS;
+		gsi_ep_count = NUM_GSI_OUT_EPS(dwc);
 	/* IN GSI EPs */
 	else if (gsi_ep_count && direction)
-		gsi_ep_count = NUM_GSI_IN_EPS;
+		gsi_ep_count = NUM_GSI_IN_EPS(dwc);
 
 	for (i = 0; i < num; i++) {
 		u8 epnum = (i << 1) | (direction ? 1 : 0);
@@ -2422,9 +2443,12 @@ static int dwc3_gadget_init_hw_endpoints(struct dwc3 *dwc,
 		if ((gsi_ep_index < gsi_ep_count) &&
 				(i > (num - 1 - gsi_ep_count))) {
 			gsi_ep_index++;
-			/* For GSI EPs, name eps as "gsi-epin" or "gsi-epout" */
-			snprintf(dep->name, sizeof(dep->name), "%s",
-				(epnum & 1) ? "gsi-epin" : "gsi-epout");
+			/*
+			 * For GSI EPs, name eps as "gsi-epin<i>" or
+			 * "gsi-epout<i>"
+			 */
+			snprintf(dep->name, sizeof(dep->name), "%s%d",
+			    (epnum & 1) ? "gsi-epin" : "gsi-epout", epnum >> 1);
 			/* Set ep type as GSI */
 			dep->endpoint.ep_type = EP_TYPE_GSI;
 		} else {
@@ -2705,6 +2729,23 @@ static int dwc3_cleanup_done_reqs(struct dwc3 *dwc, struct dwc3_ep *dep,
 	return 1;
 }
 
+static void dwc3_gsi_ep_transfer_complete(struct dwc3 *dwc, struct dwc3_ep *dep)
+{
+	struct usb_ep *ep = &dep->endpoint;
+	struct dwc3_trb *trb;
+	dma_addr_t offset;
+
+	/*
+	 * Doorbell needs to be rung with the next TRB that is going to be
+	 * processed by hardware.
+	 * So, if 'n'th TRB got completed then ring doorbell with (n+1) TRB.
+	 */
+	dwc3_ep_inc_trb(dep, &dep->trb_dequeue);
+	trb = &dep->trb_pool[dep->trb_dequeue];
+	offset = dwc3_trb_dma_offset(dep, trb);
+	usb_gsi_ep_op(ep, (void *)&offset, GSI_EP_OP_UPDATE_DB);
+}
+
 static void dwc3_endpoint_transfer_complete(struct dwc3 *dwc,
 		struct dwc3_ep *dep, const struct dwc3_event_depevt *event)
 {
@@ -2716,6 +2757,15 @@ static void dwc3_endpoint_transfer_complete(struct dwc3 *dwc,
 
 	if (event->status & DEPEVT_STATUS_BUSERR)
 		status = -ECONNRESET;
+	/*
+	 * Check if NORMAL EP is used with GSI.
+	 * In that case dwc3 driver recevies EP events from hardware and
+	 * updates GSI doorbell with completed TRB.
+	 */
+	if (dep->endpoint.ep_type == EP_TYPE_GSI) {
+		dwc3_gsi_ep_transfer_complete(dwc, dep);
+		return;
+	}
 
 	clean_busy = dwc3_cleanup_done_reqs(dwc, dep, event, status);
 	if (clean_busy && (!dep->endpoint.desc || is_xfer_complete ||
@@ -3171,6 +3221,8 @@ static void dwc3_gadget_conndone_interrupt(struct dwc3 *dwc)
 	speed = reg & DWC3_DSTS_CONNECTSPD;
 	dwc->speed = speed;
 
+	/* Reset the retry on erratic error event count */
+	dwc->retries_on_error = 0;
 	dwc3_update_ram_clk_sel(dwc, speed);
 
 	switch (speed) {
@@ -3545,7 +3597,7 @@ static void dwc3_gadget_interrupt(struct dwc3 *dwc,
 		break;
 	case DWC3_DEVICE_EVENT_ERRATIC_ERROR:
 		dwc3_trace(trace_dwc3_gadget, "Erratic Error");
-		dbg_event(0xFF, "ERROR", 0);
+		dbg_event(0xFF, "ERROR", dwc->retries_on_error);
 		dwc->dbg_gadget_events.erratic_error++;
 		break;
 	case DWC3_DEVICE_EVENT_CMD_CMPL:
@@ -3634,6 +3686,7 @@ static irqreturn_t dwc3_process_event_buf(struct dwc3 *dwc)
 			if (dwc3_notify_event(dwc,
 						DWC3_CONTROLLER_ERROR_EVENT, 0))
 				dwc->err_evt_seen = 0;
+			dwc->retries_on_error++;
 			break;
 		}
 
@@ -3868,7 +3921,6 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 	dwc->gadget.speed		= USB_SPEED_UNKNOWN;
 	dwc->gadget.sg_supported	= true;
 	dwc->gadget.name		= "dwc3-gadget";
-	dwc->gadget.is_otg		= dwc->dr_mode == USB_DR_MODE_OTG;
 	dwc->gadget.l1_supported	= !dwc->usb2_l1_disable;
 
 	/*

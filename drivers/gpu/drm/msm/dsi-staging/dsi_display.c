@@ -67,14 +67,6 @@ static const struct of_device_id dsi_display_dt_match[] = {
 static struct dsi_display *primary_display;
 static struct dsi_display *secondary_display;
 
-const char *dsi_get_display_name(void)
-{
-	if (primary_display)
-		return primary_display->name;
-	else
-		return NULL;
-}
-
 static void dsi_display_mask_ctrl_error_interrupts(struct dsi_display *display,
 			u32 mask, bool enable)
 {
@@ -203,8 +195,6 @@ int dsi_display_set_backlight(void *display, u32 bl_lvl)
 		rc = dsi_panel_enable_doze_backlight(panel, (u32)bl_temp);
 		if (rc)
 			pr_err("unable to enable doze backlight\n");
-	} else if (drm_dev && drm_dev->doze_state == DRM_BLANK_LP2) {
-		pr_err("unable to set doze backlight in LP2 state:%u\n", (u32)bl_temp);
 	} else {
 		drm_dev->doze_brightness = DOZE_BRIGHTNESS_INVALID;
 		rc = dsi_panel_set_backlight(panel, (u32)bl_temp);
@@ -4653,6 +4643,12 @@ int dsi_display_cont_splash_config(void *dsi_display)
 		return -EINVAL;
 	}
 
+	/* Continuous splash not supported by external bridge */
+	if (dsi_display_has_ext_bridge(display)) {
+		display->is_cont_splash_enabled = false;
+		return 0;
+	}
+
 	mutex_lock(&display->display_lock);
 
 	/* Vote for gdsc required to read register address space */
@@ -4696,19 +4692,14 @@ int dsi_display_cont_splash_config(void *dsi_display)
 		goto clk_manager_update;
 	}
 
-	/* For external bridge, regulators are managed by bridge driver */
-	if (!dsi_display_has_ext_bridge(display)) {
-		/* Vote on panel regulator will be removed
-		 * during suspend path
-		 */
-		rc = dsi_pwr_enable_regulator(&display->panel->power_info,
-				true);
-		if (rc) {
-			pr_err("[%s] failed to enable vregs, rc=%d\n",
-					display->panel->name, rc);
-			goto clks_disabled;
-		}
+	/* Vote on panel regulator will be removed during suspend path */
+	rc = dsi_pwr_enable_regulator(&display->panel->power_info, true);
+	if (rc) {
+		pr_err("[%s] failed to enable vregs, rc=%d\n",
+				display->panel->name, rc);
+		goto clks_disabled;
 	}
+
 	dsi_config_host_engine_state_for_cont_splash(display);
 	mutex_unlock(&display->display_lock);
 

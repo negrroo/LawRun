@@ -20,7 +20,6 @@
 #include <linux/kernel.h>
 #include <linux/export.h>
 #include <linux/sched.h>
-#include <linux/sched/topology.h>
 #include <linux/smp.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>

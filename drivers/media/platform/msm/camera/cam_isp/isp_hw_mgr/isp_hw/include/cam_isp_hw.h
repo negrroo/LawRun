@@ -31,7 +31,6 @@ struct cam_isp_timestamp {
 	struct timeval          mono_time;
 	struct timeval          vt_time;
 	uint64_t                ticks;
-	uint64_t                time_usecs;
 };
 
 /*
@@ -98,7 +97,7 @@ enum cam_isp_hw_cmd_type {
 	CAM_ISP_HW_CMD_GET_REG_DUMP,
 	CAM_ISP_HW_CMD_SOF_IRQ_DEBUG,
 	CAM_ISP_HW_CMD_SET_CAMIF_DEBUG,
-	CAM_ISP_HW_CMD_FPS_UPDATE,
+	CAM_ISP_HW_CMD_GET_IRQ_REGISTER_DUMP,
 	CAM_ISP_HW_CMD_MAX,
 };
 
@@ -224,4 +223,3 @@ struct cam_isp_hw_dual_isp_update_args {
 	struct cam_isp_dual_config      *dual_cfg;
 };
 #endif /* _CAM_ISP_HW_H_ */
-

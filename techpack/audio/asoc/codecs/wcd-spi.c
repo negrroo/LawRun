@@ -1,6 +1,5 @@
 /*
  * Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
- * Copyright (C) 2019 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,7 +26,6 @@
 #include <sound/wcd-dsp-mgr.h>
 #include <sound/wcd-spi.h>
 #include <soc/wcd-spi-ac.h>
-#include <soc/qcom/socinfo.h>
 #include "wcd-spi-registers.h"
 
 /* Byte manipulations */
@@ -700,15 +698,8 @@ static int wcd_spi_clk_ctrl(struct spi_device *spi,
 		 */
 		if (test_bit(WCD_SPI_CLK_STATE_ENABLED, &wcd_spi->status_mask))
 			goto done;
-		else if (wcd_spi->clk_users == 1) {
+		else if (wcd_spi->clk_users == 1)
 			ret = wcd_spi_clk_enable(spi);
-			if ((get_hw_version_platform() == HARDWARE_PLATFORM_PERSEUS) &&
-			     (get_hw_version_major() == 2) &&
-			     (get_hw_version_minor() == 0)) {
-				if (ret != 0)
-					wcd_spi->clk_users = 0;
-			}
-		}
 
 	} else {
 		wcd_spi->clk_users--;

@@ -9,7 +9,6 @@
 #include <linux/interrupt.h>
 #include <linux/cpu.h>
 #include <linux/sched.h>
-#include <linux/sched/topology.h>
 
 #include "blk.h"
 

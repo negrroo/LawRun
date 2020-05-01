@@ -38,6 +38,7 @@
 #define MAX_NR_TRBS_PER_CHAN		9
 #define MHI_QTI_IFACE_ID		4
 #define MHI_ADPL_IFACE_ID		5
+#define MHI_CV2X_IFACE_ID		6
 #define DEVICE_NAME			"mhi"
 #define MAX_DEVICE_NAME_SIZE		80
 
@@ -45,6 +46,10 @@
 #define MHI_UCI_ASYNC_WRITE_TIMEOUT	msecs_to_jiffies(100)
 #define MHI_UCI_AT_CTRL_READ_TIMEOUT	msecs_to_jiffies(1000)
 #define MHI_UCI_WRITE_REQ_AVAIL_TIMEOUT msecs_to_jiffies(1000)
+
+#define MHI_UCI_RELEASE_TIMEOUT_MIN	5000
+#define MHI_UCI_RELEASE_TIMEOUT_MAX	5100
+#define MHI_UCI_RELEASE_TIMEOUT_COUNT	30
 
 enum uci_dbg_level {
 	UCI_DBG_VERBOSE = 0x0,
@@ -87,6 +92,8 @@ struct chan_attr {
 	bool wr_cmpl;
 	/* Uevent broadcast of channel state */
 	bool state_bcast;
+	/* Skip node creation if not needed */
+	bool skip_node;
 	/* Number of write request structs to allocate */
 	u32 num_wr_reqs;
 
@@ -220,6 +227,29 @@ static const struct chan_attr uci_chan_attr_table[] = {
 		true
 	},
 	{
+		MHI_CLIENT_DCI_OUT,
+		TRB_MAX_DATA_SIZE,
+		MAX_NR_TRBS_PER_CHAN,
+		MHI_DIR_OUT,
+		NULL,
+		NULL,
+		NULL,
+		false,
+		true
+	},
+	{
+		MHI_CLIENT_DCI_IN,
+		TRB_MAX_DATA_SIZE,
+		MAX_NR_TRBS_PER_CHAN,
+		MHI_DIR_IN,
+		NULL,
+		NULL,
+		NULL,
+		false,
+		false,
+		true
+	},
+	{
 		MHI_CLIENT_DUN_OUT,
 		TRB_MAX_DATA_SIZE,
 		MAX_NR_TRBS_PER_CHAN,
@@ -235,6 +265,7 @@ static const struct chan_attr uci_chan_attr_table[] = {
 		NULL,
 		NULL,
 		NULL,
+		false,
 		false,
 		false,
 		50
@@ -371,43 +402,6 @@ static int mhi_uci_client_release(struct inode *mhi_inode,
 static unsigned int mhi_uci_client_poll(struct file *file, poll_table *wait);
 static unsigned int mhi_uci_ctrl_poll(struct file *file, poll_table *wait);
 static struct mhi_uci_ctxt_t uci_ctxt;
-
-static bool mhi_uci_are_channels_connected(struct uci_client *uci_client)
-{
-	uint32_t info_ch_in, info_ch_out;
-	int rc;
-
-	/*
-	 * Check channel states and return true only if channel
-	 * information is available and in connected state.
-	 * For all other failure conditions return false.
-	 */
-	rc = mhi_ctrl_state_info(uci_client->in_chan, &info_ch_in);
-	if (rc) {
-		uci_log(UCI_DBG_DBG,
-			"Channels %d is not available with %d\n",
-			uci_client->out_chan, rc);
-		return false;
-	}
-
-	rc = mhi_ctrl_state_info(uci_client->out_chan, &info_ch_out);
-	if (rc) {
-		uci_log(UCI_DBG_DBG,
-			"Channels %d is not available with %d\n",
-			uci_client->out_chan, rc);
-		return false;
-	}
-
-	if ((info_ch_in != MHI_STATE_CONNECTED) ||
-		(info_ch_out != MHI_STATE_CONNECTED)) {
-		uci_log(UCI_DBG_DBG,
-			"Channels %d or %d are not connected\n",
-			uci_client->in_chan, uci_client->out_chan);
-		return false;
-	}
-
-	return true;
-}
 
 static int mhi_init_read_chan(struct uci_client *client_handle,
 		enum mhi_client_channel chan)
@@ -660,15 +654,6 @@ static unsigned int mhi_uci_client_poll(struct file *file, poll_table *wait)
 
 	poll_wait(file, &uci_handle->read_wq, wait);
 	poll_wait(file, &uci_handle->write_wq, wait);
-	/*
-	 * Check if the channels on which the clients are trying
-	 * to poll are in connected state and return with the
-	 * appropriate mask if channels are disconnected.
-	 */
-	if (!mhi_uci_are_channels_connected(uci_handle)) {
-		mask = POLLHUP;
-		return mask;
-	}
 	mask = uci_handle->at_ctrl_mask;
 	if (!atomic_read(&uci_ctxt.mhi_disabled) &&
 		!mhi_dev_channel_isempty(uci_handle->in_handle)) {
@@ -812,9 +797,6 @@ static int open_client_mhi_channels(struct uci_client *uci_client)
 {
 	int rc = 0;
 
-	if (!mhi_uci_are_channels_connected(uci_client))
-		return -ENODEV;
-
 	uci_log(UCI_DBG_DBG,
 			"Starting channels %d %d.\n",
 			uci_client->out_chan,
@@ -929,39 +911,55 @@ static int mhi_uci_client_release(struct inode *mhi_inode,
 		struct file *file_handle)
 {
 	struct uci_client *uci_handle = file_handle->private_data;
+	int count = 0;
 
 	if (!uci_handle)
 		return -EINVAL;
 
-	if (atomic_sub_return(1, &uci_handle->ref_count) == 0) {
-		uci_log(UCI_DBG_DBG,
-				"Last client left, closing channel 0x%x\n",
-				iminor(mhi_inode));
-		if (atomic_read(&uci_handle->mhi_chans_open)) {
-			atomic_set(&uci_handle->mhi_chans_open, 0);
-
-			if (!(uci_handle->f_flags & O_SYNC))
-				kfree(uci_handle->wreqs);
-			mutex_lock(&uci_handle->out_chan_lock);
-			mhi_dev_close_channel(uci_handle->out_handle);
-			wake_up(&uci_handle->write_wq);
-			mutex_unlock(&uci_handle->out_chan_lock);
-
-			mutex_lock(&uci_handle->in_chan_lock);
-			mhi_dev_close_channel(uci_handle->in_handle);
-			wake_up(&uci_handle->read_wq);
-			mutex_unlock(&uci_handle->in_chan_lock);
-
-		}
-		atomic_set(&uci_handle->read_data_ready, 0);
-		atomic_set(&uci_handle->write_data_ready, 0);
-		file_handle->private_data = NULL;
-	} else {
-		uci_log(UCI_DBG_DBG,
-			"Client close chan %d, ref count 0x%x\n",
+	if (atomic_sub_return(1, &uci_handle->ref_count)) {
+		uci_log(UCI_DBG_DBG, "Client close chan %d, ref count 0x%x\n",
 			iminor(mhi_inode),
 			atomic_read(&uci_handle->ref_count));
+		return 0;
 	}
+
+	uci_log(UCI_DBG_DBG,
+			"Last client left, closing channel 0x%x\n",
+			iminor(mhi_inode));
+
+	do {
+		if (mhi_dev_channel_has_pending_write(uci_handle->out_handle))
+			usleep_range(MHI_UCI_RELEASE_TIMEOUT_MIN,
+				MHI_UCI_RELEASE_TIMEOUT_MAX);
+		else
+			break;
+	} while (++count < MHI_UCI_RELEASE_TIMEOUT_COUNT);
+
+	if (count == MHI_UCI_RELEASE_TIMEOUT_COUNT) {
+		uci_log(UCI_DBG_DBG, "Channel %d has pending writes\n",
+			iminor(mhi_inode));
+	}
+
+	if (atomic_read(&uci_handle->mhi_chans_open)) {
+		atomic_set(&uci_handle->mhi_chans_open, 0);
+
+		if (!(uci_handle->f_flags & O_SYNC))
+			kfree(uci_handle->wreqs);
+		mutex_lock(&uci_handle->out_chan_lock);
+		mhi_dev_close_channel(uci_handle->out_handle);
+		wake_up(&uci_handle->write_wq);
+		mutex_unlock(&uci_handle->out_chan_lock);
+
+		mutex_lock(&uci_handle->in_chan_lock);
+		mhi_dev_close_channel(uci_handle->in_handle);
+		wake_up(&uci_handle->read_wq);
+		mutex_unlock(&uci_handle->in_chan_lock);
+	}
+
+	atomic_set(&uci_handle->read_data_ready, 0);
+	atomic_set(&uci_handle->write_data_ready, 0);
+	file_handle->private_data = NULL;
+
 	return 0;
 }
 
@@ -1016,6 +1014,15 @@ static int mhi_state_uevent(struct device *dev, struct kobj_uevent_env *env)
 	nbytes = 0;
 	mhi_parse_state(buf, &nbytes, info);
 	add_uevent_var(env, "MHI_CHANNEL_STATE_12=%s", buf);
+
+	rc = mhi_ctrl_state_info(MHI_CLIENT_DCI_OUT, &info);
+	if (rc) {
+		pr_err("Failed to obtain channel 20 state\n");
+		return -EINVAL;
+	}
+	nbytes = 0;
+	mhi_parse_state(buf, &nbytes, info);
+	add_uevent_var(env, "MHI_CHANNEL_STATE_20=%s", buf);
 
 	return 0;
 }
@@ -1313,13 +1320,6 @@ void mhi_uci_chan_state_notify(struct mhi_dev *mhi,
 		uci_log(UCI_DBG_ERROR,
 				"Sending uevent failed for chan %d\n", ch_id);
 
-	if (ch_state == MHI_STATE_DISCONNECTED &&
-			!atomic_read(&uci_handle->ref_count)) {
-		/* Issue wake only if there is an active client */
-		wake_up(&uci_handle->read_wq);
-		wake_up(&uci_handle->write_wq);
-	}
-
 	kfree(buf[0]);
 }
 EXPORT_SYMBOL(mhi_uci_chan_state_notify);
@@ -1609,6 +1609,29 @@ static long mhi_uci_client_ioctl(struct file *file, unsigned int cmd,
 			sizeof(epinfo));
 		if (rc)
 			uci_log(UCI_DBG_ERROR, "copying to user space failed");
+	} else if (cmd == MHI_UCI_CV2X_EP_LOOKUP) {
+		uci_log(UCI_DBG_DBG, "CV2X EP_LOOKUP for client:%d\n",
+						uci_handle->client_index);
+		epinfo.ph_ep_info.ep_type = DATA_EP_TYPE_PCIE;
+		epinfo.ph_ep_info.peripheral_iface_id = MHI_CV2X_IFACE_ID;
+		epinfo.ipa_ep_pair.cons_pipe_num =
+			ipa_get_ep_mapping(IPA_CLIENT_MHI2_PROD);
+		epinfo.ipa_ep_pair.prod_pipe_num =
+			ipa_get_ep_mapping(IPA_CLIENT_MHI2_CONS);
+
+		uci_log(UCI_DBG_DBG, "client:%d ep_type:%d intf:%d\n",
+			uci_handle->client_index,
+			epinfo.ph_ep_info.ep_type,
+			epinfo.ph_ep_info.peripheral_iface_id);
+
+		uci_log(UCI_DBG_DBG, "ipa_cons2_idx:%d ipa_prod2_idx:%d\n",
+			epinfo.ipa_ep_pair.cons_pipe_num,
+			epinfo.ipa_ep_pair.prod_pipe_num);
+
+		rc = copy_to_user((void __user *)arg, &epinfo,
+			sizeof(epinfo));
+		if (rc)
+			uci_log(UCI_DBG_ERROR, "copying to user space failed");
 	} else {
 		uci_log(UCI_DBG_ERROR, "wrong parameter:%d\n", cmd);
 		rc = -EINVAL;
@@ -1750,8 +1773,16 @@ static void mhi_uci_at_ctrl_client_cb(struct mhi_dev_client_cb_data *cb_data)
 		uci_ctxt.at_ctrl_wq = NULL;
 		if (!(client->f_flags & O_SYNC))
 			kfree(client->wreqs);
-		mhi_dev_close_channel(client->out_handle);
-		mhi_dev_close_channel(client->in_handle);
+		rc = mhi_dev_close_channel(client->out_handle);
+		if (rc)
+			uci_log(UCI_DBG_INFO,
+			"Failed to close channel %d ret %d\n",
+			client->out_chan, rc);
+		rc = mhi_dev_close_channel(client->in_handle);
+		if (rc)
+			uci_log(UCI_DBG_INFO,
+			"Failed to close channel %d ret %d\n",
+			client->in_chan, rc);
 	}
 }
 
@@ -1882,7 +1913,8 @@ int mhi_uci_init(void)
 		 * this client's channels is called by the MHI driver,
 		 * if one is registered.
 		 */
-		if (mhi_client->in_chan_attr->chan_state_cb)
+		if (mhi_client->in_chan_attr->chan_state_cb ||
+				mhi_client->in_chan_attr->skip_node)
 			continue;
 		ret_val = uci_device_create(mhi_client);
 		if (ret_val)
@@ -1936,4 +1968,3 @@ failed_class_add:
 failed_char_alloc:
 	return r;
 }
-
