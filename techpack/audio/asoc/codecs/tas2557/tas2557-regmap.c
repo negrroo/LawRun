@@ -1,6 +1,7 @@
 /*
 ** =============================================================================
 ** Copyright (c) 2016  Texas Instruments Inc.
+** Copyright (C) 2019 XiaoMi, Inc.
 **
 ** This program is free software; you can redistribute it and/or modify it under
 ** the terms of the GNU General Public License as published by the Free Software
@@ -67,7 +68,7 @@ static int tas2557_change_book_page(
 {
 	int nResult = 0;
 
-	if ((pTAS2557->mnCurrentBook == nBook) 
+	if ((pTAS2557->mnCurrentBook == nBook)
 		&& pTAS2557->mnCurrentPage == nPage)
 		goto end;
 
@@ -135,7 +136,7 @@ static int tas2557_dev_read(
 				TAS2557_PAGE_REG(nRegister));
 	}
 
-	nResult = tas2557_change_book_page(pTAS2557, 
+	nResult = tas2557_change_book_page(pTAS2557,
 				TAS2557_BOOK_ID(nRegister),
 				TAS2557_PAGE_ID(nRegister));
 	if (nResult >= 0) {
@@ -390,7 +391,7 @@ static void irq_work_routine(struct work_struct *work)
 	mutex_lock(&pTAS2557->file_lock);
 #endif
 
-	if (pTAS2557->mnErrCode & ERROR_FAILSAFE)
+	if(pTAS2557->mnErrCode & ERROR_FAILSAFE)
 		goto program;
 
 	if (pTAS2557->mbRuntimeSuspend) {
@@ -900,6 +901,7 @@ static struct i2c_driver tas2557_i2c_driver = {
 #if defined(CONFIG_OF)
 			.of_match_table = of_match_ptr(tas2557_of_match),
 #endif
+			.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		},
 	.probe = tas2557_i2c_probe,
 	.remove = tas2557_i2c_remove,

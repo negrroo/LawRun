@@ -1,6 +1,7 @@
 /*
 ** =============================================================================
 ** Copyright (c) 2016  Texas Instruments Inc.
+** Copyright (C) 2019 XiaoMi, Inc.
 **
 ** This program is free software; you can redistribute it and/or modify it under
 ** the terms of the GNU General Public License as published by the Free Software
@@ -311,7 +312,8 @@ static void failsafe(struct tas2557_priv *pTAS2557)
 	pTAS2557->mnErrCode |= ERROR_FAILSAFE;
 	if (hrtimer_active(&pTAS2557->mtimer))
 		hrtimer_cancel(&pTAS2557->mtimer);
-	if (pTAS2557->mnRestart < RESTART_MAX) {
+	if(pTAS2557->mnRestart < RESTART_MAX)
+	{
 		pTAS2557->mnRestart ++;
 		msleep(100);
 		dev_err(pTAS2557->dev, "I2C COMM error, restart SmartAmp.\n");
@@ -515,10 +517,10 @@ int tas2557_enable(struct tas2557_priv *pTAS2557, bool bEnable)
 			pFWName = TAS2557_DEFAULT_FW_NAME;
 
 		nResult = request_firmware_nowait(THIS_MODULE, 1, pFWName,
-				pTAS2557->dev, GFP_KERNEL, pTAS2557, tas2557_fw_ready);
-		if (nResult < 0)
+			pTAS2557->dev, GFP_KERNEL, pTAS2557, tas2557_fw_ready);
+		if(nResult < 0)
 			goto end;
-		dev_dbg(pTAS2557->dev, "%s, firmware is loaded\n", __func__);
+		dev_err(pTAS2557->dev, "%s, firmware is loaded\n", __func__);
 	}
 
 	/* check safe guard*/
@@ -571,7 +573,9 @@ int tas2557_enable(struct tas2557_priv *pTAS2557, bool bEnable)
 				goto end;
 
 			pTAS2557->mbPowerUp = true;
-			if (config_24bit_flag) {
+			if(config_24bit_flag)
+			{
+//set_configuration_for_24bit
 				config_24bit = set_configuration_for_24bit(pTAS2557);
 				tas2557_set_config(pTAS2557, config_24bit);
 				config_24bit_flag = 0;
@@ -1470,7 +1474,7 @@ static int tas2557_load_configuration(struct tas2557_priv *pTAS2557,
 
 	dev_dbg(pTAS2557->dev, "%s: %d\n", __func__, nConfiguration);
 
-	if (nConfiguration == 4 || nConfiguration == 10)
+	if((nConfiguration == 4)||(nConfiguration == 10))
 		set_calibration_E1s_E8 = nConfiguration;
 
 	if ((!pTAS2557->mpFirmware->mpPrograms) ||
