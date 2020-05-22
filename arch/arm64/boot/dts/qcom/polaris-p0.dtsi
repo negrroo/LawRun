@@ -153,12 +153,6 @@
 		thermal,batt-level-screen-off = "0 1 1 1 3 4 5 5 5 7 9 14 16";
 	};
 
-	xiaomi_touch {
-		compatible = "xiaomi-touch";
-		status = "ok";
-		touch,name = "xiaomi-touch";
-	};
-
 };
 
 &labibb {
