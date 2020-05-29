@@ -1332,7 +1332,6 @@ static void msm_pcie_sel_debug_testcase(struct msm_pcie_dev_t *dev,
 	static void __iomem *loopback_lbar_vir;
 	int ret, i;
 	u32 base_sel_size = 0;
-	u32 wr_ofst = 0;
 
 	switch (testcase) {
 	case MSM_PCIE_OUTPUT_PCIE_INFO:
@@ -1564,24 +1563,22 @@ static void msm_pcie_sel_debug_testcase(struct msm_pcie_dev_t *dev,
 			break;
 		}
 
-		wr_ofst = wr_offset;
-
 		PCIE_DBG_FS(dev,
 			"base: %s: 0x%pK\nwr_offset: 0x%x\nwr_mask: 0x%x\nwr_value: 0x%x\n",
 			dev->res[base_sel - 1].name,
 			dev->res[base_sel - 1].base,
-			wr_ofst, wr_mask, wr_value);
+			wr_offset, wr_mask, wr_value);
 
 		base_sel_size = resource_size(dev->res[base_sel - 1].resource);
 
-		if (wr_ofst >  base_sel_size - 4 ||
-			msm_pcie_check_align(dev, wr_ofst))
+		if (wr_offset >  base_sel_size - 4 ||
+			msm_pcie_check_align(dev, wr_offset))
 			PCIE_DBG_FS(dev,
 				"PCIe: RC%d: Invalid wr_offset: 0x%x. wr_offset should be no more than 0x%x\n",
-				dev->rc_idx, wr_ofst, base_sel_size - 4);
+				dev->rc_idx, wr_offset, base_sel_size - 4);
 		else
 			msm_pcie_write_reg_field(dev->res[base_sel - 1].base,
-				wr_ofst, wr_mask, wr_value);
+				wr_offset, wr_mask, wr_value);
 
 		break;
 	case MSM_PCIE_DUMP_PCIE_REGISTER_SPACE:
@@ -3773,7 +3770,7 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 
 	/* assert PCIe reset link to keep EP in reset */
 
-	PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
+	PCIE_DBG(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
 		dev->rc_idx);
 	gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
 				dev->gpio[MSM_PCIE_GPIO_PERST].on);
@@ -3896,7 +3893,7 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 		dev->rc_idx, retries);
 
 	if (pcie_phy_is_ready(dev))
-		PCIE_INFO(dev, "PCIe RC%d PHY is ready!\n", dev->rc_idx);
+		PCIE_DBG(dev, "PCIe RC%d PHY is ready!\n", dev->rc_idx);
 	else {
 		PCIE_ERR(dev, "PCIe PHY RC%d failed to come up!\n",
 			dev->rc_idx);
@@ -3914,7 +3911,7 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 
 	/* de-assert PCIe reset link to bring EP out of reset */
 
-	PCIE_INFO(dev, "PCIe: Release the reset of endpoint of RC%d.\n",
+	PCIE_DBG(dev, "PCIe: Release the reset of endpoint of RC%d.\n",
 		dev->rc_idx);
 	gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
 				1 - dev->gpio[MSM_PCIE_GPIO_PERST].on);
@@ -3959,9 +3956,9 @@ static int msm_pcie_enable(struct msm_pcie_dev_t *dev, u32 options)
 		msm_pcie_confirm_linkup(dev, false, false, NULL)) {
 		PCIE_DBG(dev, "Link is up after %d checkings\n",
 			link_check_count);
-		PCIE_INFO(dev, "PCIe RC%d link initialized\n", dev->rc_idx);
+		PCIE_DBG(dev, "PCIe RC%d link initialized\n", dev->rc_idx);
 	} else {
-		PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
+		PCIE_DBG(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
 			dev->rc_idx);
 		gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
 			dev->gpio[MSM_PCIE_GPIO_PERST].on);
@@ -4065,7 +4062,7 @@ static void msm_pcie_disable(struct msm_pcie_dev_t *dev, u32 options)
 	dev->power_on = false;
 	dev->link_turned_off_counter++;
 
-	PCIE_INFO(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
+	PCIE_DBG(dev, "PCIe: Assert the reset of endpoint of RC%d.\n",
 		dev->rc_idx);
 
 	gpio_set_value(dev->gpio[MSM_PCIE_GPIO_PERST].num,
@@ -5548,7 +5545,7 @@ static void msm_pcie_config_link_pm_rc(struct msm_pcie_dev_t *dev,
 {
 	bool child_l0s_enable = 0, child_l1_enable = 0, child_l1ss_enable = 0;
 
-	if (!pdev->subordinate || list_empty(&pdev->subordinate->devices)) {
+	if (!pdev->subordinate || !(&pdev->subordinate->devices)) {
 		PCIE_DBG(dev,
 			"PCIe: RC%d: no device connected to root complex\n",
 			dev->rc_idx);

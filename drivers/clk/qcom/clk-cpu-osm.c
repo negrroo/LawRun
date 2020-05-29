@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -76,7 +76,7 @@ static DEFINE_VDD_REGS_INIT(vdd_pwrcl_mx_ao, 1);
 struct osm_entry {
 	u16 virtual_corner;
 	u16 open_loop_volt;
-	unsigned long frequency;
+	long frequency;
 	u32 lval;
 	u16 ccount;
 };
@@ -143,8 +143,7 @@ static inline bool is_better_rate(unsigned long req, unsigned long best,
 	return (req <= new && new < best) || (best < req && best < new);
 }
 
-static int clk_osm_search_table(struct osm_entry *table, int entries,
-				unsigned long rate)
+static int clk_osm_search_table(struct osm_entry *table, int entries, long rate)
 {
 	int index;
 
@@ -174,21 +173,21 @@ static unsigned long clk_osm_recalc_rate(struct clk_hw *hw,
 	return c->rate;
 }
 
-static int clk_osm_determine_rate(struct clk_hw *hw,
-				struct clk_rate_request *req)
+static long clk_osm_round_rate(struct clk_hw *hw, unsigned long rate,
+				unsigned long *parent_rate)
 {
 	int i;
 	unsigned long rrate = 0;
-	unsigned long rate = req->rate;
+
+	if (!hw)
+		return -EINVAL;
 
 	/*
 	 * If the rate passed in is 0, return the first frequency in the
 	 * FMAX table.
 	 */
-	if (!rate) {
-		req->rate = hw->init->rate_max[0];
-		return 0;
-	}
+	if (!rate)
+		return hw->init->rate_max[0];
 
 	for (i = 0; i < hw->init->num_rate_max; i++) {
 		if (is_better_rate(rate, rrate, hw->init->rate_max[i])) {
@@ -198,12 +197,10 @@ static int clk_osm_determine_rate(struct clk_hw *hw,
 		}
 	}
 
-	req->rate = rrate;
+	pr_debug("%s: rate %lu, rrate %ld, Rate max %ld\n", __func__, rate,
+						rrate, hw->init->rate_max[i]);
 
-	pr_debug("clk:%s rate %lu, rrate %lu, Rate max %lu index %u\n",
-			hw->init->name, rate, rrate, hw->init->rate_max[i], i);
-
-	return 0;
+	return rrate;
 }
 
 static int clk_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
@@ -285,40 +282,40 @@ static unsigned long clk_cpu_recalc_rate(struct clk_hw *hw,
 	return parent->osm_table[index].frequency;
 }
 
-static int clk_cpu_determine_rate(struct clk_hw *hw,
-				struct clk_rate_request *req)
+static long clk_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
+				unsigned long *parent_rate)
 {
 	struct clk_hw *parent_hw = clk_hw_get_parent(hw);
-	unsigned long rate = req->rate;
 
-	req->rate = clk_hw_round_rate(parent_hw, rate);
+	if (!parent_hw)
+		return -EINVAL;
 
-	return 0;
+	*parent_rate = rate;
+	return clk_hw_round_rate(parent_hw, rate);
 }
 
 static int l3_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 				    unsigned long parent_rate)
 {
 	struct clk_osm *cpuclk = to_clk_osm(hw);
-	struct clk_rate_request req;
 	int index = 0;
+	unsigned long r_rate;
 	int count = 40;
 	u32 curr_lval;
 
 	if (!cpuclk)
 		return -EINVAL;
 
-	req.rate = rate;
-	clk_osm_determine_rate(hw, &req);
+	r_rate = clk_osm_round_rate(hw, rate, NULL);
 
-	if (rate != req.rate) {
+	if (rate != r_rate) {
 		pr_err("invalid requested rate=%ld\n", rate);
 		return -EINVAL;
 	}
 
 	/* Convert rate to table index */
 	index = clk_osm_search_table(cpuclk->osm_table,
-				     cpuclk->num_entries, req.rate);
+				     cpuclk->num_entries, r_rate);
 	if (index < 0) {
 		pr_err("cannot set %s to %lu\n", clk_hw_get_name(hw), rate);
 		return -EINVAL;
@@ -373,7 +370,7 @@ static unsigned long l3_clk_recalc_rate(struct clk_hw *hw,
 }
 
 static const struct clk_ops clk_ops_l3_osm = {
-	.determine_rate = clk_osm_determine_rate,
+	.round_rate = clk_osm_round_rate,
 	.list_rate = clk_osm_list_rate,
 	.recalc_rate = l3_clk_recalc_rate,
 	.set_rate = l3_clk_set_rate,
@@ -382,23 +379,23 @@ static const struct clk_ops clk_ops_l3_osm = {
 
 static const struct clk_ops clk_ops_pwrcl_core = {
 	.set_rate = clk_pwrcl_set_rate,
-	.determine_rate = clk_cpu_determine_rate,
+	.round_rate = clk_cpu_round_rate,
 	.recalc_rate = clk_cpu_recalc_rate,
 	.debug_init = clk_debug_measure_add,
 };
 
 static const struct clk_ops clk_ops_perfcl_core = {
 	.set_rate = clk_cpu_set_rate,
-	.determine_rate = clk_cpu_determine_rate,
+	.round_rate = clk_cpu_round_rate,
 	.recalc_rate = clk_cpu_recalc_rate,
 	.debug_init = clk_debug_measure_add,
 };
 
 static const struct clk_ops clk_ops_cpu_osm = {
 	.set_rate = clk_osm_set_rate,
+	.round_rate = clk_osm_round_rate,
 	.recalc_rate = clk_osm_recalc_rate,
 	.list_rate = clk_osm_list_rate,
-	.determine_rate = clk_osm_determine_rate,
 	.debug_init = clk_debug_measure_add,
 };
 

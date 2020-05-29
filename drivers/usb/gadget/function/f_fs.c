@@ -1302,9 +1302,6 @@ static int ffs_aio_cancel(struct kiocb *kiocb)
 
 	ENTER();
 
-	ffs_log("enter:state %d setup_state %d flag %lu", epfile->ffs->state,
-		epfile->ffs->setup_state, epfile->ffs->flags);
-
 	spin_lock_irqsave(&epfile->ffs->eps_lock, flags);
 
 	if (likely(io_data && io_data->ep && io_data->req))
@@ -2060,12 +2057,12 @@ static void ffs_data_reset(struct ffs_data *ffs)
 	ffs->setup_state = FFS_NO_SETUP;
 	ffs->flags = 0;
 
+	ffs_log("exit: state %d setup_state %d flag %lu", ffs->state,
+		ffs->setup_state, ffs->flags);
+
 	ffs->ms_os_descs_ext_prop_count = 0;
 	ffs->ms_os_descs_ext_prop_name_len = 0;
 	ffs->ms_os_descs_ext_prop_data_len = 0;
-
-	ffs_log("exit: state %d setup_state %d flag %lu", ffs->state,
-		ffs->setup_state, ffs->flags);
 }
 
 

@@ -3390,6 +3390,7 @@ update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq, bool update_freq)
  */
 #define UPDATE_TG	0x1
 #define SKIP_AGE_LOAD	0x2
+#define SKIP_CPUFREQ	0x4
 
 /* Update task and its cfs_rq load average */
 static inline void update_load_avg(struct sched_entity *se, int flags)
@@ -3411,7 +3412,7 @@ static inline void update_load_avg(struct sched_entity *se, int flags)
 			  cfs_rq->curr == se, NULL);
 	}
 
-	decayed  = update_cfs_rq_load_avg(now, cfs_rq, true);
+	decayed  = update_cfs_rq_load_avg(now, cfs_rq, !(flags & SKIP_CPUFREQ));
 	decayed |= propagate_entity_load_avg(se);
 
 	if (decayed && (flags & UPDATE_TG))
@@ -3569,6 +3570,7 @@ update_cfs_rq_load_avg(u64 now, struct cfs_rq *cfs_rq, bool update_freq)
 
 #define UPDATE_TG	0x0
 #define SKIP_AGE_LOAD	0x0
+#define SKIP_CPUFREQ	0x0
 
 static inline void update_load_avg(struct sched_entity *se, int not_used1)
 {
@@ -3794,6 +3796,8 @@ static __always_inline void return_cfs_rq_runtime(struct cfs_rq *cfs_rq);
 static void
 dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
+	int update_flags;
+
 	/*
 	 * Update run-time statistics of the 'current'.
 	 */
@@ -3807,7 +3811,12 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	 *   - For group entity, update its weight to reflect the new share
 	 *     of its group cfs_rq.
 	 */
-	update_load_avg(se, UPDATE_TG);
+	update_flags = UPDATE_TG;
+
+	if (flags & DEQUEUE_IDLE)
+		update_flags |= SKIP_CPUFREQ;
+
+	update_load_avg(se, update_flags);
 	dequeue_entity_load_avg(cfs_rq, se);
 
 	update_stats_dequeue(cfs_rq, se, flags);
@@ -4322,9 +4331,6 @@ static void throttle_cfs_rq(struct cfs_rq *cfs_rq)
 			dequeue_entity(qcfs_rq, se, DEQUEUE_SLEEP);
 		qcfs_rq->h_nr_running -= task_delta;
 		walt_dec_throttled_cfs_rq_stats(&qcfs_rq->walt_stats, cfs_rq);
-		walt_propagate_cumulative_runnable_avg(
-				   &qcfs_rq->cumulative_runnable_avg,
-				   cfs_rq->cumulative_runnable_avg, false);
 
 		if (qcfs_rq->load.weight)
 			dequeue = 0;
@@ -4333,9 +4339,6 @@ static void throttle_cfs_rq(struct cfs_rq *cfs_rq)
 	if (!se) {
 		sub_nr_running(rq, task_delta);
 		walt_dec_throttled_cfs_rq_stats(&rq->walt_stats, cfs_rq);
-		walt_propagate_cumulative_runnable_avg(
-				   &rq->cumulative_runnable_avg,
-				   cfs_rq->cumulative_runnable_avg, false);
 	}
 
 	cfs_rq->throttled = 1;
@@ -4399,9 +4402,6 @@ void unthrottle_cfs_rq(struct cfs_rq *cfs_rq)
 			enqueue_entity(cfs_rq, se, ENQUEUE_WAKEUP);
 		cfs_rq->h_nr_running += task_delta;
 		walt_inc_throttled_cfs_rq_stats(&cfs_rq->walt_stats, tcfs_rq);
-		walt_propagate_cumulative_runnable_avg(
-				   &cfs_rq->cumulative_runnable_avg,
-				   tcfs_rq->cumulative_runnable_avg, true);
 
 		if (cfs_rq_throttled(cfs_rq))
 			break;
@@ -4410,9 +4410,6 @@ void unthrottle_cfs_rq(struct cfs_rq *cfs_rq)
 	if (!se) {
 		add_nr_running(rq, task_delta);
 		walt_inc_throttled_cfs_rq_stats(&rq->walt_stats, tcfs_rq);
-		walt_propagate_cumulative_runnable_avg(
-				   &rq->cumulative_runnable_avg,
-				   tcfs_rq->cumulative_runnable_avg, true);
 	}
 
 	/* determine whether we need to wake up potentially idle cpu */
@@ -5100,6 +5097,9 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct sched_entity *se = &p->se;
 	int task_sleep = flags & DEQUEUE_SLEEP;
 
+	if (task_sleep && rq->nr_running == 1)
+		flags |= DEQUEUE_IDLE;
+
 	for_each_sched_entity(se) {
 		cfs_rq = cfs_rq_of(se);
 		dequeue_entity(cfs_rq, se, flags);
@@ -5131,6 +5131,8 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	}
 
 	for_each_sched_entity(se) {
+		int update_flags;
+
 		cfs_rq = cfs_rq_of(se);
 		cfs_rq->h_nr_running--;
 		walt_dec_cfs_rq_stats(cfs_rq, p);
@@ -5138,7 +5140,12 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		if (cfs_rq_throttled(cfs_rq))
 			break;
 
-		update_load_avg(se, UPDATE_TG);
+		update_flags = UPDATE_TG;
+
+		if (flags & DEQUEUE_IDLE)
+			update_flags |= SKIP_CPUFREQ;
+
+		update_load_avg(se, update_flags);
 		update_cfs_shares(se);
 	}
 
@@ -11799,8 +11806,6 @@ const struct sched_class fair_sched_class = {
 #endif
 #ifdef CONFIG_SCHED_WALT
 	.fixup_walt_sched_stats	= walt_fixup_sched_stats_fair,
-	.fixup_cumulative_runnable_avg =
-		walt_fixup_cumulative_runnable_avg_fair,
 #endif
 };
 

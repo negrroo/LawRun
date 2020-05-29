@@ -1491,6 +1491,7 @@ extern const u32 sched_prio_to_wmult[40];
 #define DEQUEUE_SLEEP		0x01
 #define DEQUEUE_SAVE		0x02 /* matches ENQUEUE_RESTORE */
 #define DEQUEUE_MOVE		0x04 /* matches ENQUEUE_MOVE */
+#define DEQUEUE_IDLE		0x80 /* The last dequeue before IDLE */
 
 #define ENQUEUE_WAKEUP		0x01
 #define ENQUEUE_RESTORE		0x02
@@ -1572,9 +1573,6 @@ struct sched_class {
 #ifdef CONFIG_SCHED_WALT
 	void (*fixup_walt_sched_stats)(struct rq *rq, struct task_struct *p,
 				      u32 new_task_load, u32 new_pred_demand);
-	void (*fixup_cumulative_runnable_avg)(struct rq *rq,
-					      struct task_struct *task,
-					      u64 new_task_load);
 #endif
 };
 
@@ -2342,10 +2340,7 @@ static inline u64 irq_time_read(int cpu)
 u64 sched_ktime_clock(void);
 void note_task_waking(struct task_struct *p, u64 wallclock);
 #else /* CONFIG_SCHED_WALT */
-static inline u64 sched_ktime_clock(void)
-{
-	return 0;
-}
+#define sched_ktime_clock ktime_get_ns
 static inline void note_task_waking(struct task_struct *p, u64 wallclock) { }
 #endif /* CONFIG_SCHED_WALT */
 

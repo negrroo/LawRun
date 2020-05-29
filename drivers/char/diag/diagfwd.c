@@ -591,7 +591,7 @@ void diag_process_stm_mask(uint8_t cmd, uint8_t data_mask, int data_type)
 	}
 }
 
-int diag_process_stm_cmd(unsigned char *buf, int len, unsigned char *dest_buf)
+int diag_process_stm_cmd(unsigned char *buf, unsigned char *dest_buf)
 {
 	uint8_t version, mask, cmd;
 	uint8_t rsp_supported = 0;
@@ -603,11 +603,7 @@ int diag_process_stm_cmd(unsigned char *buf, int len, unsigned char *dest_buf)
 		       buf, dest_buf, __func__);
 		return -EIO;
 	}
-	if (len < STM_CMD_NUM_BYTES) {
-		pr_err("diag: Invalid buffer length: %d in %s\n", len,
-			__func__);
-		return -EINVAL;
-	}
+
 	version = *(buf + STM_CMD_VERSION_OFFSET);
 	mask = *(buf + STM_CMD_MASK_OFFSET);
 	cmd = *(buf + STM_CMD_DATA_OFFSET);
@@ -1122,13 +1118,12 @@ int diag_process_apps_pkt(unsigned char *buf, int len, int pid)
 	} else if ((len >= ((2 * sizeof(uint8_t)) + sizeof(uint16_t))) &&
 		(*buf == 0x4b) && (*(buf+1) == 0x12) &&
 		(*(uint16_t *)(buf+2) == DIAG_DIAG_STM)) {
-		write_len = diag_process_stm_cmd(buf, len,
-			driver->apps_rsp_buf);
-		if (write_len > 0) {
-			diag_send_rsp(driver->apps_rsp_buf, write_len, pid);
+		len = diag_process_stm_cmd(buf, driver->apps_rsp_buf);
+		if (len > 0) {
+			diag_send_rsp(driver->apps_rsp_buf, len, pid);
 			return 0;
 		}
-		return write_len;
+		return len;
 	}
 	/* Check for time sync query command */
 	else if ((len >= ((2 * sizeof(uint8_t)) + sizeof(uint16_t))) &&

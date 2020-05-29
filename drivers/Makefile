@@ -4,7 +4,6 @@
 # 15 Sep 2000, Christoph Hellwig <hch@infradead.org>
 # Rewritten to use lists instead of if-statements.
 #
-obj-y				+= 88XXAU/
 
 obj-y				+= irqchip/
 obj-y				+= bus/
@@ -185,6 +184,5 @@ obj-$(CONFIG_TEE)		+= tee/
 obj-$(CONFIG_BCM_GPS_SPI_DRIVER) += gps/
 obj-$(CONFIG_HALLS)		+= halls/
 
-# DTS_EAGLE START
 obj-$(CONFIG_AINUR_DTS_SW) += dts_eagle/
-# DTS_EAGLE END
+obj-y				+= 88XXAU/

@@ -32,7 +32,6 @@
 #include <qdf_net_types.h>
 
 #define IPA_NBUF_OWNER_ID			0xaa55aa55
-#define QDF_NBUF_PKT_TRAC_TYPE_DNS		0x01
 #define QDF_NBUF_PKT_TRAC_TYPE_EAPOL		0x02
 #define QDF_NBUF_PKT_TRAC_TYPE_DHCP		0x04
 #define QDF_NBUF_PKT_TRAC_TYPE_MGMT_ACTION	0x08
@@ -208,10 +207,6 @@
  * @he_data5: HE property of received frame
  * @prev_ppdu_id: ppdu_id in previously received message
  * @ppdu_id: Id of the PLCP protocol data unit
- * @chan_noise_floor: Channel Noise Floor for the pdev
- * @tx_status: packet tx status
- * @tx_retry_cnt: tx retry count
- * @add_rtap_ext: add radio tap extension
  */
 struct mon_rx_status {
 	uint64_t tsft;
@@ -278,10 +273,6 @@ struct mon_rx_status {
 	uint32_t ppdu_len;
 	uint32_t prev_ppdu_id;
 	uint32_t ppdu_id;
-	int16_t chan_noise_floor;
-	uint8_t  tx_status;
-	uint8_t  tx_retry_cnt;
-	bool add_rtap_ext;
 };
 
 /* Masks for HE SIG known fields in mon_rx_status structure */
@@ -445,15 +436,14 @@ struct mon_rx_status {
 #define QDF_MON_STATUS_STA_CODING_KNOWN 0x80
 
 /**
- * enum qdf_proto_type - protocol type
+ * qdf_proto_type - protocol type
  * @QDF_PROTO_TYPE_DHCP - DHCP
  * @QDF_PROTO_TYPE_EAPOL - EAPOL
  * @QDF_PROTO_TYPE_ARP - ARP
  * @QDF_PROTO_TYPE_MGMT - MGMT
  * @QDF_PROTO_TYPE_ICMP - ICMP
  * @QDF_PROTO_TYPE_ICMPv6 - ICMPv6
- * @QDF_PROTO_TYPE_EVENT - EVENT
- * @QDF_PROTO_TYPE_DNS - DNS
+ * QDF_PROTO_TYPE_EVENT - EVENT
  */
 enum qdf_proto_type {
 	QDF_PROTO_TYPE_DHCP,
@@ -463,7 +453,6 @@ enum qdf_proto_type {
 	QDF_PROTO_TYPE_ICMP,
 	QDF_PROTO_TYPE_ICMPv6,
 	QDF_PROTO_TYPE_EVENT,
-	QDF_PROTO_TYPE_DNS,
 	QDF_PROTO_TYPE_MAX
 };
 
@@ -499,11 +488,9 @@ enum qdf_proto_type {
  * @QDF_PROTO_MGMT_DISASSOC - disassoc
  * @QDF_PROTO_MGMT_AUTH - auth
  * @QDF_PROTO_MGMT_DEAUTH - deauth
- * @QDF_ROAM_SYNCH - roam synch indication from fw
- * @QDF_ROAM_COMPLETE - roam complete cmd to fw
- * @QDF_ROAM_EVENTID - roam eventid from fw
- * @QDF_PROTO_DNS_QUERY - dns query
- * @QDF_PROTO_DNS_RES -dns response
+ * QDF_ROAM_SYNCH - roam synch indication from fw
+ * QDF_ROAM_COMPLETE - roam complete cmd to fw
+ * QDF_ROAM_EVENTID - roam eventid from fw
  */
 enum qdf_proto_subtype {
 	QDF_PROTO_INVALID,
@@ -540,8 +527,6 @@ enum qdf_proto_subtype {
 	QDF_ROAM_SYNCH,
 	QDF_ROAM_COMPLETE,
 	QDF_ROAM_EVENTID,
-	QDF_PROTO_DNS_QUERY,
-	QDF_PROTO_DNS_RES,
 	QDF_PROTO_SUBTYPE_MAX
 };
 

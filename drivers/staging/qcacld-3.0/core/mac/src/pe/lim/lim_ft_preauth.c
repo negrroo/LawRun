@@ -441,10 +441,8 @@ void lim_handle_ft_pre_auth_rsp(tpAniSirGlobal pMac, QDF_STATUS status,
 		pftSessionEntry =
 			pe_create_session(pMac, pbssDescription->bssId,
 					&sessionId, pMac->lim.maxStation,
-					psessionEntry->bssType,
-					psessionEntry->smeSessionId,
-					psessionEntry->pePersona);
-		if (!pftSessionEntry) {
+					psessionEntry->bssType);
+		if (pftSessionEntry == NULL) {
 			pe_err("Session not created for pre-auth 11R AP");
 			status = QDF_STATUS_E_FAILURE;
 			psessionEntry->ftPEContext.ftPreAuthStatus = status;

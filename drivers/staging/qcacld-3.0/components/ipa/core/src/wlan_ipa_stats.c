@@ -941,9 +941,6 @@ static void __wlan_ipa_wdi_meter_notifier_cb(qdf_ipa_wdi_meter_evt_type_t evt,
 				ipa_ctx->ipa_quota_rsp.success;
 		}
 		break;
-
-	default:
-		break;
 	}
 }
 

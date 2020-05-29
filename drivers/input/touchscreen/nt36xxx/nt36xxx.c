@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 - 2017 Novatek, Inc.
- * Copyright (C) 2019 XiaoMi, Inc.
+ * Copyright (C) 2018 XiaoMi, Inc.
  *
  * $Revision: 20544 $
  * $Date: 2017-12-20 11:08:15 +0800 (週三, 20 十二月 2017) $
@@ -40,7 +40,6 @@
 
 #include "nt36xxx.h"
 
-
 #if NVT_TOUCH_EXT_PROC
 extern int32_t nvt_extra_proc_init(void);
 #endif
@@ -79,8 +78,6 @@ static int drm_notifier_callback(struct notifier_block *self, unsigned long even
 #define INPUT_EVENT_PALM_OFF		12
 #define INPUT_EVENT_PALM_ON		13
 #define INPUT_EVENT_END				13
-
-#define PROC_SYMLINK_PATH "touchpanel"
 
 #if TOUCH_KEY_NUM > 0
 const uint16_t touch_key_array[TOUCH_KEY_NUM] = {
@@ -123,8 +120,6 @@ int32_t CTP_I2C_READ(struct i2c_client *client, uint16_t address, uint8_t *buf, 
 	int32_t ret = -1;
 	int32_t retries = 0;
 
-	mutex_lock(&ts->xbuf_lock);
-
 	msgs[0].flags = !I2C_M_RD;
 	msgs[0].addr  = address;
 	msgs[0].len   = 1;
@@ -133,12 +128,11 @@ int32_t CTP_I2C_READ(struct i2c_client *client, uint16_t address, uint8_t *buf, 
 	msgs[1].flags = I2C_M_RD;
 	msgs[1].addr  = address;
 	msgs[1].len   = len - 1;
-	msgs[1].buf   = ts->xbuf;
+	msgs[1].buf   = &buf[1];
 
 	while (retries < 5) {
 		ret = i2c_transfer(client->adapter, msgs, 2);
-		if (ret == 2)
-			break;
+		if (ret == 2)	break;
 		retries++;
 		msleep(20);
 		NVT_ERR("error, retry=%d\n", retries);
@@ -148,9 +142,6 @@ int32_t CTP_I2C_READ(struct i2c_client *client, uint16_t address, uint8_t *buf, 
 		NVT_ERR("error, ret=%d\n", ret);
 		ret = -EIO;
 	}
-	memcpy(buf + 1, ts->xbuf, len - 1);
-
-	mutex_unlock(&ts->xbuf_lock);
 
 	return ret;
 }
@@ -167,17 +158,15 @@ int32_t CTP_I2C_WRITE(struct i2c_client *client, uint16_t address, uint8_t *buf,
 	struct i2c_msg msg;
 	int32_t ret = -1;
 	int32_t retries = 0;
-	mutex_lock(&ts->xbuf_lock);
 
 	msg.flags = !I2C_M_RD;
 	msg.addr  = address;
 	msg.len   = len;
-	memcpy(ts->xbuf, buf, len);
-	msg.buf   = ts->xbuf;
+	msg.buf   = buf;
+
 	while (retries < 5) {
 		ret = i2c_transfer(client->adapter, &msg, 1);
-		if (ret == 1)
-			break;
+		if (ret == 1)	break;
 		retries++;
 		msleep(20);
 		NVT_ERR("error, retry=%d\n", retries);
@@ -187,8 +176,6 @@ int32_t CTP_I2C_WRITE(struct i2c_client *client, uint16_t address, uint8_t *buf,
 		NVT_ERR("error, ret=%d\n", ret);
 		ret = -EIO;
 	}
-
-	mutex_unlock(&ts->xbuf_lock);
 
 	return ret;
 }
@@ -646,7 +633,7 @@ void nvt_ts_wakeup_gesture_report(uint8_t gesture_id, uint8_t *data)
 
 	NVT_LOG("gesture_id = %d\n", gesture_id);
 
-		switch (gesture_id) {
+	switch (gesture_id) {
 		case GESTURE_WORD_C:
 			NVT_LOG("Gesture : Word-C.\n");
 			keycode = gesture_key_array[0];
@@ -701,7 +688,7 @@ void nvt_ts_wakeup_gesture_report(uint8_t gesture_id, uint8_t *data)
 			break;
 		default:
 			break;
-		}
+	}
 
 	if (keycode > 0) {
 		input_report_key(ts->input_dev, keycode, 1);
@@ -768,7 +755,7 @@ static int nvt_parse_dt(struct device *dev)
 	}
 
 	retval = of_property_read_u32(np, "novatek,config-array-size",
-				 (u32 *) &ts->config_array_size);
+				 (u32 *) & ts->config_array_size);
 	if (retval) {
 		NVT_LOG("Unable to get array size\n");
 		return retval;
@@ -1007,11 +994,14 @@ static void nvt_switch_mode_work(struct work_struct *work)
 	struct nvt_mode_switch *ms = container_of(work, struct nvt_mode_switch, switch_mode_work);
 	struct nvt_ts_data *data = ms->nvt_data;
 	unsigned char value = ms->mode;
+	char ch[64] = {0x0,};
 
-	if (value >= INPUT_EVENT_WAKUP_MODE_OFF && value <= INPUT_EVENT_WAKUP_MODE_ON)
+	if (value >= INPUT_EVENT_WAKUP_MODE_OFF && value <= INPUT_EVENT_WAKUP_MODE_ON) {
 		data->gesture_enabled = value - INPUT_EVENT_WAKUP_MODE_OFF;
-	else
+		snprintf(ch, sizeof(ch), "%s", data->gesture_enabled ? "enabled" : "disabled");
+	} else {
 		NVT_ERR("Does not support touch mode %d\n", value);
+	}
 
 	if (ms != NULL) {
 		kfree(ms);
@@ -1056,7 +1046,7 @@ Description:
 return:
 	n.a.
 *******************************************************/
-static void nvt_ts_work_func(void)
+static void nvt_ts_work_func(struct work_struct *work)
 {
 	int32_t ret = -1;
 	uint8_t point_data[POINT_DATA_LEN + 1] = {0};
@@ -1089,10 +1079,11 @@ static void nvt_ts_work_func(void)
 	}
 
 #if WAKEUP_GESTURE
-	if (unlikely(bTouchIsAwake == 0)) {
+	if (bTouchIsAwake == 0) {
 		input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
-		goto XFER_ERROR;
+		enable_irq(ts->client->irq);
+		mutex_unlock(&ts->lock);
 		return;
 	}
 #endif
@@ -1168,19 +1159,19 @@ static void nvt_ts_work_func(void)
 
 #if TOUCH_KEY_NUM > 0
 	if (point_data[61] == 0xF8) {
-		for (i = 0; i < ts->max_button_num; i++)
-			input_report_key(
-				ts->input_dev, touch_key_array[i],
-				((point_data[62] >> i) & 0x01));
+		for (i = 0; i < ts->max_button_num; i++) {
+			input_report_key(ts->input_dev, touch_key_array[i], ((point_data[62] >> i) & 0x01));
+		}
 	} else {
-		for (i = 0; i < ts->max_button_num; i++)
+		for (i = 0; i < ts->max_button_num; i++) {
 			input_report_key(ts->input_dev, touch_key_array[i], 0);
+		}
 	}
 #endif
 
-XFER_ERROR:
 	input_sync(ts->input_dev);
 
+XFER_ERROR:
 	enable_irq(ts->client->irq);
 
 	mutex_unlock(&ts->lock);
@@ -1199,10 +1190,7 @@ static irqreturn_t nvt_ts_irq_handler(int32_t irq, void *dev_id)
 	if (bTouchIsAwake == 0) {
 		dev_dbg(&ts->client->dev, "%s gesture wakeup\n", __func__);
 	}
-
-	pm_qos_update_request(&ts->pm_qos_req, 100);
-	nvt_ts_work_func();
-	pm_qos_update_request(&ts->pm_qos_req, PM_QOS_DEFAULT_VALUE);
+	queue_work(nvt_wq, &ts->nvt_work);
 
 	return IRQ_HANDLED;
 }
@@ -1422,7 +1410,7 @@ static ssize_t tpdbg_write(struct file *file, const char __user *buf, size_t siz
 	cmd[size] = '\0';
 
 	if (!strncmp(cmd, "irq-disable", 11))
-		disable_irq_nosync(ts->client->irq);
+		disable_irq(ts->client->irq);
 	else if (!strncmp(cmd, "irq-enable", 10))
 		enable_irq(ts->client->irq);
 	else if (!strncmp(cmd, "tp-sd-en", 8))
@@ -1497,24 +1485,24 @@ err_pinctrl_get:
 static ssize_t nvt_panel_color_show(struct device *dev,
 				    struct device_attribute *attr, char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[2]);
+	return snprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[2]);
 }
 
 static ssize_t nvt_panel_vendor_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[6]);
+	return snprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[6]);
 }
 
 static ssize_t nvt_panel_display_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
-	return scnprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[1]);
+	return snprintf(buf, PAGE_SIZE, "%c\n", ts->lockdown_info[1]);
 }
 
-static DEVICE_ATTR(panel_vendor, (0444), nvt_panel_vendor_show, NULL);
-static DEVICE_ATTR(panel_color, (0444), nvt_panel_color_show, NULL);
-static DEVICE_ATTR(panel_display, (0444), nvt_panel_display_show, NULL);
+static DEVICE_ATTR(panel_vendor, (S_IRUGO), nvt_panel_vendor_show, NULL);
+static DEVICE_ATTR(panel_color, (S_IRUGO), nvt_panel_color_show, NULL);
+static DEVICE_ATTR(panel_display, (S_IRUGO), nvt_panel_display_show, NULL);
 
 static struct attribute *nvt_attr_group[] = {
 	&dev_attr_panel_vendor.attr,
@@ -1546,7 +1534,6 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	}
 
 	ts->client = client;
-	ts->input_proc = NULL;
 	i2c_set_clientdata(client, ts);
 
 	/*---parse dts---*/
@@ -1580,7 +1567,6 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 
 	/* need 10ms delay after POR(power on reset) */
 	msleep(10);
-	mutex_init(&ts->xbuf_lock);
 
 	/*---check chip version trim---*/
 	ret = nvt_ts_check_chip_ver_trim();
@@ -1600,15 +1586,13 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	mutex_unlock(&ts->lock);
 
 	/*---create workqueue---*/
-	nvt_wq = alloc_workqueue("nvt_wq",
-						WQ_HIGHPRI | WQ_UNBOUND | WQ_FREEZABLE |
-						WQ_MEM_RECLAIM, 0);
+	nvt_wq = create_workqueue("nvt_wq");
 	if (!nvt_wq) {
 		NVT_ERR("nvt_wq create workqueue failed\n");
 		ret = -ENOMEM;
 		goto err_create_nvt_wq_failed;
 	}
-
+	INIT_WORK(&ts->nvt_work, nvt_ts_work_func);
 	/*---allocate input device---*/
 	ts->input_dev = input_allocate_device();
 	if (ts->input_dev == NULL) {
@@ -1626,7 +1610,7 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	ts->int_trigger_type = INT_TRIGGER_TYPE;
 
 	/*---set input device info.---*/
-	ts->input_dev->evbit[0] = BIT_MASK(EV_SYN) | BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
+	ts->input_dev->evbit[0] = BIT_MASK(EV_SYN) | BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS) ;
 	ts->input_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
 	ts->input_dev->propbit[0] = BIT(INPUT_PROP_DIRECT);
 
@@ -1655,12 +1639,12 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 #endif
 
 #if WAKEUP_GESTURE
-	for (retry = 0; retry < (ARRAY_SIZE(gesture_key_array)); retry++) {
+	for (retry = 0; retry < (sizeof(gesture_key_array) / sizeof(gesture_key_array[0])); retry++) {
 		input_set_capability(ts->input_dev, EV_KEY, gesture_key_array[retry]);
 	}
 #endif
 
-	scnprintf(ts->phys, PAGE_SIZE, "input/ts");
+	sprintf(ts->phys, "input/ts");
 	ts->input_dev->name = NVT_TS_NAME;
 	ts->input_dev->phys = ts->phys;
 	ts->input_dev->id.bustype = BUS_I2C;
@@ -1680,16 +1664,13 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	/* we should enable the reg for lpwg mode */
 	/*nvt_enable_reg(ts, true);*/
 
-	pm_qos_add_request(&ts->pm_qos_req, PM_QOS_CPU_DMA_LATENCY,
-			PM_QOS_DEFAULT_VALUE);
-
 	/*---set int-pin & request irq---*/
 	client->irq = gpio_to_irq(ts->irq_gpio);
 	if (client->irq) {
 		NVT_LOG("int_trigger_type=%d\n", ts->int_trigger_type);
 
 #if WAKEUP_GESTURE
-		ret = request_threaded_irq(client->irq, NULL, nvt_ts_irq_handler, ts->int_trigger_type | IRQF_ONESHOT, client->name, ts);
+		ret = request_irq(client->irq, nvt_ts_irq_handler, ts->int_trigger_type | IRQF_ONESHOT, client->name, ts);
 #else
 		ret = request_irq(client->irq, nvt_ts_irq_handler, ts->int_trigger_type, client->name, ts);
 #endif
@@ -1697,7 +1678,7 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 			NVT_ERR("request irq failed. ret=%d\n", ret);
 			goto err_int_request_failed;
 		} else {
-			disable_irq_nosync(client->irq);
+			disable_irq(client->irq);
 			NVT_LOG("request irq %d succeed\n", client->irq);
 		}
 	}
@@ -1805,7 +1786,6 @@ err_register_drm_notif_failed:
 #if (NVT_TOUCH_PROC || NVT_TOUCH_EXT_PROC || NVT_TOUCH_MP)
 err_init_NVT_ts:
 #endif
-	pm_qos_remove_request(&ts->pm_qos_req);
 	free_irq(client->irq, ts);
 #if BOOT_UPDATE_FIRMWARE
 err_create_nvt_fwu_wq_failed:
@@ -1852,8 +1832,6 @@ static int32_t nvt_ts_remove(struct i2c_client *client)
 
 	NVT_LOG("Removing driver...\n");
 
-	pm_qos_remove_request(&ts->pm_qos_req);
-
 	free_irq(client->irq, ts);
 	input_unregister_device(ts->input_dev);
 	i2c_set_clientdata(client, NULL);
@@ -1892,10 +1870,16 @@ static int32_t nvt_ts_suspend(struct device *dev)
 		/*---write i2c command to enter "wakeup gesture mode"---*/
 		buf[0] = EVENT_MAP_HOST_CMD;
 		buf[1] = 0x13;
+#if 0 /* Do not set 0xFF first, ToDo */
+		buf[2] = 0xFF;
+		buf[3] = 0xFF;
+		CTP_I2C_WRITE(ts->client, I2C_FW_Address, buf, 4);
+#else
 		CTP_I2C_WRITE(ts->client, I2C_FW_Address, buf, 2);
+#endif
 		NVT_LOG("Enabled touch wakeup gesture\n");
 	} else {
-		disable_irq_nosync(ts->client->irq);
+		disable_irq(ts->client->irq);
 		/*---write i2c command to enter "deep sleep mode"---*/
 		buf[0] = EVENT_MAP_HOST_CMD;
 		buf[1] = 0x11;
@@ -1906,7 +1890,7 @@ static int32_t nvt_ts_suspend(struct device *dev)
 
 			if (ret < 0) {
 				NVT_ERR("Failed to select %s pinstate %d\n",
-					PINCTRL_STATE_SUSPEND, ret);
+					PINCTRL_STATE_ACTIVE, ret);
 			}
 		} else {
 			NVT_ERR("Failed to init pinctrl\n");
@@ -2009,6 +1993,7 @@ static int drm_notifier_callback(struct notifier_block *self, unsigned long even
 				/*drm_dsi_ulps_enable(true);*/
 				/*drm_dsi_ulps_suspend_enable(true);*/
 			}
+			flush_workqueue(ts->event_wq);
 			nvt_ts_suspend(&ts->client->dev);
 		} else if (*blank == DRM_BLANK_UNBLANK) {
 			if (ts->gesture_enabled) {
@@ -2027,7 +2012,8 @@ static int drm_notifier_callback(struct notifier_block *self, unsigned long even
 				/*drm_dsi_ulps_suspend_enable(false);*/
 				nvt_enable_reg(ts, false);
 			}
-			nvt_ts_resume(&ts->client->dev);
+			flush_workqueue(ts->event_wq);
+			queue_work(ts->event_wq, &ts->resume_work);
 		}
 	}
 

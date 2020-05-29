@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
  * Copyright (C) 2018 XiaoMi, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -674,11 +674,8 @@ static int fg_get_battery_temp(struct fg_chip *chip, int *val)
 
 	temp = ((buf[1] & BATT_TEMP_MSB_MASK) << 8) |
 		(buf[0] & BATT_TEMP_LSB_MASK);
-	temp = DIV_ROUND_CLOSEST(temp, 4);
-
-	/* Value is in Kelvin; Convert it to deciDegC */
-	temp = (temp - 273) * 10;
-	*val = temp;
+	/* Value is in 0.25Kelvin; Convert it to deciDegC */
+	*val = DIV_ROUND_CLOSEST((temp - 273*4) * 10, 4);
 	return 0;
 }
 
@@ -3777,18 +3774,15 @@ static int fg_get_time_to_empty(struct fg_chip *chip, int *val)
 {
 	int rc, ibatt_avg, msoc, full_soc, act_cap_mah, divisor;
 
-	mutex_lock(&chip->ttf.lock);
 	rc = fg_circ_buf_median(&chip->ttf.ibatt, &ibatt_avg);
 	if (rc < 0) {
 		/* try to get instantaneous current */
 		rc = fg_get_battery_current(chip, &ibatt_avg);
 		if (rc < 0) {
 			pr_err("failed to get battery current, rc=%d\n", rc);
-			mutex_unlock(&chip->ttf.lock);
 			return rc;
 		}
 	}
-	mutex_unlock(&chip->ttf.lock);
 
 	ibatt_avg /= MILLI_UNIT;
 	/* clamp ibatt_avg to 100mA */

@@ -1,4 +1,4 @@
-/* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -81,10 +81,6 @@
 				<45 512 207108 1146880>, <1 512 207108 3124992>;
 
 	};
-};
-
-&ipa_hw {
-	qcom,use-xbl-boot;
 };
 
 &i2c_3 {
