@@ -379,7 +379,6 @@ typedef struct ol_osif_vdev_t *ol_osif_vdev_handle;
  * @wlan_op_mode_sta: STA (client) mode
  * @wlan_op_mode_monitor: Monitor mode
  * @wlan_op_mode_ocb: OCB mode
- * @wlan_op_mode_nan: NAN mode
  */
 enum wlan_op_mode {
 	wlan_op_mode_unknown,
@@ -389,7 +388,6 @@ enum wlan_op_mode {
 	wlan_op_mode_monitor,
 	wlan_op_mode_ocb,
 	wlan_op_mode_ndi,
-	wlan_op_mode_nan,
 };
 
 /**

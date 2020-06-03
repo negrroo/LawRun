@@ -1184,7 +1184,7 @@ static int adreno_of_get_power(struct adreno_device *adreno_dev,
 		device->pwrctrl.pm_qos_wakeup_latency = 101;
 
 	if (of_property_read_u32(node, "qcom,idle-timeout", &timeout))
-		timeout = 80;
+		timeout = 64;
 
 	device->pwrctrl.interval_timeout = msecs_to_jiffies(timeout);
 
@@ -3068,6 +3068,9 @@ int adreno_spin_idle(struct adreno_device *adreno_dev, unsigned int timeout)
 
 		if (adreno_isidle(KGSL_DEVICE(adreno_dev)))
 			return 0;
+
+		/* relax tight loop */
+		cond_resched();
 
 	} while (time_before(jiffies, wait));
 

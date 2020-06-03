@@ -365,10 +365,10 @@ struct smb_charger {
 	struct delayed_work	reg_work;
 	struct delayed_work	uusb_otg_work;
 	struct delayed_work	bb_removal_work;
-	struct delayed_work     monitor_low_temp_work;
+	struct delayed_work	monitor_low_temp_work;
 	struct delayed_work	cc_float_charge_work;
 	struct delayed_work	typec_reenable_work;
-	struct delayed_work     charger_type_recheck;
+	struct delayed_work	charger_type_recheck;
 	struct delayed_work	connector_health_work;
 	struct delayed_work	dc_input_current_work;
 	struct delayed_work	check_vbus_work;

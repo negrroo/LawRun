@@ -2861,9 +2861,10 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	if (sd_validate_opt_xfer_size(sdkp, dev_max)) {
 		rw_max = q->limits.io_opt =
 						sdkp->opt_xfer_blocks * sdp->sector_size;
-	} else
+	} else {
 		rw_max = min_not_zero(logical_to_sectors(sdp, dev_max),
 				      (sector_t)BLK_DEF_MAX_SECTORS);
+	}
 
 	/* Do not exceed controller limit */
 	rw_max = min(rw_max, queue_max_hw_sectors(q));
@@ -3419,4 +3420,3 @@ static void sd_print_result(const struct scsi_disk *sdkp, const char *msg,
 			  "%s: Result: hostbyte=0x%02x driverbyte=0x%02x\n",
 			  msg, host_byte(result), driver_byte(result));
 }
-

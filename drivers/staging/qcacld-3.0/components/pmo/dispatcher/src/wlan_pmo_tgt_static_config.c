@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2018 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -33,6 +33,7 @@ QDF_STATUS pmo_tgt_send_enhance_multicast_offload_req(
 	struct wlan_objmgr_psoc *psoc;
 	struct wlan_pmo_tx_ops pmo_tx_ops;
 
+	pmo_enter();
 	psoc = pmo_vdev_get_psoc(vdev);
 
 	pmo_tx_ops = GET_PMO_TX_OPS_FROM_PSOC(psoc);
@@ -46,6 +47,7 @@ QDF_STATUS pmo_tgt_send_enhance_multicast_offload_req(
 	if (status != QDF_STATUS_SUCCESS)
 		pmo_err("Failed to config enhance multicast offload");
 out:
+	pmo_exit();
 
 	return status;
 }

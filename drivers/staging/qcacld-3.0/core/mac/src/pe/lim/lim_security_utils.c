@@ -366,8 +366,9 @@ void lim_delete_pre_auth_node(tpAniSirGlobal pMac, tSirMacAddr macAddr)
 
 		pMac->lim.pLimPreAuthList = pTempNode->next;
 
-		pe_debug("fRelease data for %d peer %pM",
-			 pTempNode->authNodeIdx, macAddr);
+		pe_debug("first node to delete, Release data entry: %pK id %d peer",
+			       pTempNode, pTempNode->authNodeIdx);
+		lim_print_mac_addr(pMac, macAddr, LOGD);
 		lim_release_pre_auth_node(pMac, pTempNode);
 
 		return;

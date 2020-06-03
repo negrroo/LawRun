@@ -49,9 +49,14 @@
 #include <linux/cpuset.h>
 #include <linux/vmpressure.h>
 #include <linux/freezer.h>
+#include <linux/circ_buf.h>
+#include <linux/proc_fs.h>
+#include <linux/slab.h>
+#include <linux/poll.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/almk.h>
+#include "trace/lowmemorykiller.h"
 #include <linux/show_mem_notifier.h>
 
 #ifdef CONFIG_HIGHMEM
@@ -59,13 +64,6 @@
 #else
 #define _ZONE ZONE_NORMAL
 #endif
-#include <linux/circ_buf.h>
-#include <linux/proc_fs.h>
-#include <linux/slab.h>
-#include <linux/poll.h>
-
-#define CREATE_TRACE_POINTS
-#include "trace/lowmemorykiller.h"
 
 /* to enable lowmemorykiller */
 static int enable_lmk = 1;
@@ -769,7 +767,6 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 
 		lowmem_deathpending_timeout = jiffies + HZ;
 		rem += selected_tasksize;
-
 		rcu_read_unlock();
 		/* give the system time to free up the memory */
 		msleep_interruptible(20);
