@@ -2229,6 +2229,7 @@ static int do_scsi_command(struct fsg_common *common)
 			reply = do_read_cd(common);
 		break;
 
+
 	case READ_FORMAT_CAPACITIES:
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);

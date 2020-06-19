@@ -496,8 +496,6 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 				congestion_wait(BLK_RW_ASYNC, HZ/50);
 				goto retry_encrypt;
 			}
-			data_page = NULL;
-			goto out;
 		}
 	}
 
@@ -523,7 +521,6 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 
 	/* Error stopped previous loop? Clean up buffers... */
 	if (ret) {
-	out:
 		if (data_page)
 			fscrypt_restore_control_page(data_page);
 		printk_ratelimited(KERN_ERR "%s: ret = %d\n", __func__, ret);

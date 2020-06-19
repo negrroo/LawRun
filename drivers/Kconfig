@@ -1,5 +1,7 @@
 menu "Device Drivers"
 
+source "drivers/88XXAU/Kconfig"
+
 source "drivers/amba/Kconfig"
 
 source "drivers/base/Kconfig"
@@ -214,8 +216,8 @@ source "drivers/tee/Kconfig"
 
 source "drivers/gps/Kconfig"
 
-source "drivers/dts_eagle/Kconfig"
+source "drivers/halls/Kconfig"
 
-source "drivers/88XXAU/Kconfig"
+source "drivers/dts_eagle/Kconfig"
 
 endmenu

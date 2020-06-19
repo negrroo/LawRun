@@ -31,7 +31,6 @@
 #include "ftsTime.h"
 #include "ftsTool.h"
 
-extern struct fts_ts_info *fts_info;
 /** @addtogroup system_info
 * @{
 */
@@ -90,14 +89,10 @@ int fts_system_reset(void)
 	u8 data[1] = { SYSTEM_RESET_VALUE };
 	event_to_search = (int)EVT_ID_CONTROLLER_READY;
 
-	logError(1, "%s System resetting...\n", tag);
-	if (fts_info) {
-		reinit_completion(&fts_info->tp_reset_completion);
-		atomic_set(&fts_info->system_is_resetting, 1);
-	}
+	logError(0, "%s System resetting...\n", tag);
 	for (i = 0; i < RETRY_SYSTEM_RESET && res < 0; i++) {
 		resetErrorList();
-		fts_disableInterruptNoSync();
+		fts_disableInterrupt();
 
 		if (reset_gpio == GPIO_NOT_DEFINED) {
 			res =
@@ -114,6 +109,7 @@ int fts_system_reset(void)
 			logError(1, "%s fts_system_reset: ERROR %08X\n", tag,
 				 ERROR_BUS_W);
 		} else {
+			fts_restore_regvalues();
 			res =
 			    pollForEvent(&event_to_search, 1, readData,
 					 GENERAL_TIMEOUT);
@@ -123,17 +119,13 @@ int fts_system_reset(void)
 			}
 		}
 	}
-	if (fts_info) {
-		complete(&fts_info->tp_reset_completion);
-		atomic_set(&fts_info->system_is_resetting, 0);
-	}
 	if (res < OK) {
 		logError(1,
 			 "%s fts_system_reset...failed after 3 attempts: ERROR %08X\n",
 			 tag, (res | ERROR_SYSTEM_RESET_FAIL));
 		return (res | ERROR_SYSTEM_RESET_FAIL);
 	} else {
-		logError(1, "%s System reset DONE!\n", tag);
+		logError(0, "%s System reset DONE!\n", tag);
 		system_reseted_down = 1;
 		system_reseted_up = 1;
 		return OK;
@@ -343,7 +335,7 @@ int setScanMode(u8 mode, u8 settings)
 		 tag, __func__, mode, settings);
 	if (mode == SCAN_MODE_LOW_POWER)
 		size = 2;
-	ret = fts_write_dma_safe(cmd, size);
+	ret = fts_write(cmd, size);
 	if (ret < OK) {
 		logError(1, "%s %s: write failed...ERROR %08X !\n", tag,
 			 __func__, ret);
@@ -380,7 +372,7 @@ int setFeatures(u8 feat, u8 *settings, int size)
 		logError(0, "%02X ", settings[i]);
 	}
 	logError(0, "\n");
-	ret = fts_write_dma_safe(cmd, 2 + size);
+	ret = fts_write(cmd, 2 + size);
 	if (ret < OK) {
 		logError(1, "%s %s: write failed...ERROR %08X !\n", tag,
 			 __func__, ret);
@@ -792,7 +784,7 @@ int fts_disableInterruptNoSync(void)
 			disable_irq_count++;
 		}
 
-		spin_unlock_irq(&fts_int);
+		spin_unlock(&fts_int);
 		logError(0, "%s Interrupt No Sync Disabled!\n", tag);
 		return OK;
 	} else {
@@ -948,7 +940,7 @@ int requestSyncFrame(u8 type)
 
 		logError(0, "%s %s: Requesting frame %02X  attempt = %d \n",
 			 tag, __func__, type, retry2 + 1);
-		ret = fts_write_dma_safe(request, ARRAY_SIZE(request));
+		ret = fts_write(request, ARRAY_SIZE(request));
 		if (ret >= OK) {
 
 			logError(0, "%s %s: Polling for new count... \n", tag,
@@ -1121,7 +1113,7 @@ int writeLockDownInfo(u8 *data, int size, u8 lock_id)
 			continue;
 		}
 		mdelay(10);
-		ret = fts_write_dma_safe(lockdown_save, 3);
+		ret = fts_write(lockdown_save, 3);
 		mdelay(5);
 		ret = checkEcho(lockdown_save, 3);
 		if (ret < OK) {
@@ -1193,7 +1185,7 @@ int readLockDownInfo(u8 *lockData, u8 lock_id, int size)
 		}
 		loaded_cnt = (int)((temp[3] & 0xFF) << 8) + (temp[2] & 0xFF);
 		cmd_lockdown[2] = lock_id;
-		fts_write_dma_safe(cmd_lockdown, 3);
+		fts_write(cmd_lockdown, 3);
 		mdelay(10);
 		ret = checkEcho(cmd_lockdown, 3);
 		if (ret < OK) {
@@ -1296,7 +1288,7 @@ int fts_get_lockdown_info(u8 *lockData, struct fts_ts_info *info)
 		}
 		loaded_cnt = (int)((temp[3] & 0xFF) << 8) + (temp[2] & 0xFF);
 		cmd_lockdown[2] = lock_id;
-		fts_write_dma_safe(cmd_lockdown, 3);
+		fts_write(cmd_lockdown, 3);
 		mdelay(10);
 		ret = checkEcho(cmd_lockdown, 3);
 		if (ret < OK) {

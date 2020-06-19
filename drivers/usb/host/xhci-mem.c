@@ -1533,10 +1533,6 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 	if (!usb_endpoint_xfer_isoc(&ep->desc))
 		err_count = 3;
 
-	if (usb_endpoint_xfer_bulk(&ep->desc) && udev->speed == USB_SPEED_FULL
-				&& max_packet < 8)
-		max_packet = 8;
-
 	/* HS bulk max packet should be 512, FS bulk supports 8, 16, 32 or 64 */
 	if (usb_endpoint_xfer_bulk(&ep->desc)) {
 		if (udev->speed == USB_SPEED_HIGH)

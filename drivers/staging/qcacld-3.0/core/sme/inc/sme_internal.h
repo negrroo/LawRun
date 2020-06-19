@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018, 2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,6 +38,7 @@
 #include "sme_power_save.h"
 #include "nan_api.h"
 #include "wmi_unified.h"
+#include "wmi_unified_param.h"
 
 struct wmi_twt_enable_complete_event_param;
 /*--------------------------------------------------------------------------
@@ -345,6 +346,14 @@ typedef struct tagSmeStruct {
 #ifdef WLAN_BCN_RECV_FEATURE
 	beacon_report_cb beacon_report_cb;
 	beacon_pause_cb beacon_pause_cb;
+#endif
+#ifdef FEATURE_OEM_DATA
+	void (*oem_data_event_handler_cb)
+			(const struct oem_data *oem_event_data);
+#endif
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+	sme_get_raom_scan_ch_Callback roam_scan_ch_callback;
+	void *roam_scan_ch_get_context;
 #endif
 } tSmeStruct, *tpSmeStruct;
 

@@ -26,12 +26,11 @@ static unsigned short dimmer = 100;
 static unsigned int bl_lower = LOWER_BL_LVL;
 static unsigned int bl_upper = UPPER_BL_LVL;
 static unsigned int pulse_freq = 30000;
-static unsigned int fadeback_min = 90;
-static unsigned int target_minute = 300;
-static bool dimmer_auto = 0;
+static int fadeback_min = 90;
+static int target_minute = 300;
+static bool dimmer_auto;
 static unsigned int dimmer_start_minute = 1380;
 static unsigned int dimmer_stop_minute = 360;
-static unsigned int flow_freq = DEFAULT_FLOW_FREQ;
 
 /* Core */
 static void pulse(unsigned long data);
@@ -44,6 +43,7 @@ static unsigned short flow_r = MAX_SCALE;
 static unsigned short flow_g = MAX_SCALE;
 static unsigned short flow_b = MAX_SCALE;
 static unsigned int active_minutes;
+static unsigned int flow_freq = 360;
 static unsigned int last_bl = MAX_BRIGHTNESS;
 static unsigned long local_time;
 static struct rtc_time tm;
@@ -314,11 +314,13 @@ void set_rgb_slider(bl_type_t bl_lvl)
 static void set_enabled(unsigned short val)
 {
 	if ((val == 1) && (enabled != 1)) {
+		flush_flow_timer();
 		flush_timer();
 		enabled = 1;
 		pulse(0);
 		return;
 	} else if (val == 0) {
+		flush_flow_timer();
 		set_rgb_brightness(daytime_r, daytime_g, daytime_b);
 		current_r = daytime_r;
 		current_g = daytime_g;
@@ -383,7 +385,7 @@ static int param_rgb_set(const char *buf, const struct kernel_param *kp)
 	if (tmp < MIN_SCALE || tmp > MAX_SCALE)
 		return -EINVAL;
 
-	param_set_ushort(buf, kp);
+	param_set_uint(buf, kp);
 
 	if (enabled == 2) {
 		set_rgb_slider(last_bl);
@@ -525,22 +527,22 @@ static int param_freqs_set(const char *buf, const struct kernel_param *kp)
 
 static const struct kernel_param_ops enabled_param_ops = {
 	.set = param_enabled_set,
-	.get = param_get_ushort,
+	.get = param_get_uint,
 };
 
 static const struct kernel_param_ops dimmer_param_ops = {
 	.set = param_dimmer_set,
-	.get = param_get_ushort,
+	.get = param_get_uint,
 };
 
 static const struct kernel_param_ops dimmer_auto_param_ops = {
 	.set = param_dimmer_auto_set,
-	.get = param_get_bool,
+	.get = param_get_uint,
 };
 
 static const struct kernel_param_ops rgb_param_ops = {
 	.set = param_rgb_set,
-	.get = param_get_ushort,
+	.get = param_get_uint,
 };
 
 static const struct kernel_param_ops transition_param_ops = {

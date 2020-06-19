@@ -45,7 +45,7 @@
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 #include "host_diag_core_log.h"
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
-
+#include "wlan_mlme_main.h"
 #include "wma.h"
 /**
  * Number of bytes of variation in beacon length from the last beacon
@@ -879,16 +879,12 @@ static void __sch_beacon_process_for_session(tpAniSirGlobal mac_ctx,
 
 	if (mac_ctx->roam.configParam.allow_tpc_from_ap) {
 		get_local_power_constraint_beacon(bcn, &local_constraint);
-		pe_debug("ESE localPowerConstraint = %d,",
-				local_constraint);
 
 		if (mac_ctx->rrm.rrmPEContext.rrmEnable &&
 				bcn->powerConstraintPresent) {
 			local_constraint = regMax;
 			local_constraint -=
 				bcn->localPowerConstraint.localPowerConstraints;
-			pe_debug("localPowerConstraint = %d,",
-				local_constraint);
 			}
 	}
 
@@ -901,14 +897,11 @@ static void __sch_beacon_process_for_session(tpAniSirGlobal mac_ctx,
 
 	maxTxPower = lim_get_max_tx_power(mac_ctx, &tx_pwr_attr);
 
-	pe_debug("RegMax = %d, MaxTx pwr = %d",
-			regMax, maxTxPower);
-
 	/* If maxTxPower is increased or decreased */
 	if (maxTxPower != session->maxTxPower) {
-		pe_debug(
-			FL("Local power constraint change, Updating new maxTx power %d from old pwr %d"),
-			maxTxPower, session->maxTxPower);
+		pe_debug("Local power constraint change, Updating new maxTx power %d from old pwr %d (regMax %d local %d)",
+			 maxTxPower, session->maxTxPower, regMax,
+			 local_constraint);
 		if (lim_send_set_max_tx_power_req(mac_ctx, maxTxPower, session)
 		    == QDF_STATUS_SUCCESS)
 			session->maxTxPower = maxTxPower;
@@ -933,10 +926,8 @@ static void __sch_beacon_process_for_session(tpAniSirGlobal mac_ctx,
 
 	if ((false == mac_ctx->sap.SapDfsInfo.is_dfs_cac_timer_running)
 	    && beaconParams.paramChangeBitmap) {
-		pe_debug("Beacon for session[%d] got changed.",
-			 session->peSessionId);
-		pe_debug("sending beacon param change bitmap: 0x%x",
-			 beaconParams.paramChangeBitmap);
+		pe_debug("Beacon for session[%d] got changed param change bitmap: 0x%x",
+			 session->peSessionId, beaconParams.paramChangeBitmap);
 		lim_send_beacon_params(mac_ctx, &beaconParams, session);
 	}
 
@@ -1132,6 +1123,8 @@ void sch_send_beacon_report(struct sAniSirGlobal *mac_ctx,
 				qdf_do_div(qdf_get_monotonic_boottime(),
 					   QDF_MC_TIMER_TO_MS_UNIT);
 
+		beacon_report.vdev_id = session->smeSessionId;
+
 		/* Send report to upper layer */
 		mac_ctx->lim.sme_bcn_rcv_callback(mac_ctx->hdd_handle,
 						  &beacon_report);
@@ -1196,12 +1189,12 @@ sch_beacon_edca_process(tpAniSirGlobal pMac, tSirMacEdcaParamSetIE *edca,
 			tpPESession session)
 {
 	uint8_t i;
+	struct wlan_objmgr_vdev *vdev;
+	struct vdev_mlme_priv_obj *vdev_mlme;
+	bool follow_ap_edca = false;
 #ifdef FEATURE_WLAN_DIAG_SUPPORT
 	host_log_qos_edca_pkt_type *log_ptr = NULL;
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
-
-	pe_debug("Updating parameter set count: Old %d ---> new %d",
-		session->gLimEdcaParamSetCount, edca->qosInfo.count);
 
 	session->gLimEdcaParamSetCount = edca->qosInfo.count;
 	session->gLimEdcaParams[EDCA_AC_BE] = edca->acbe;
@@ -1209,7 +1202,17 @@ sch_beacon_edca_process(tpAniSirGlobal pMac, tSirMacEdcaParamSetIE *edca,
 	session->gLimEdcaParams[EDCA_AC_VI] = edca->acvi;
 	session->gLimEdcaParams[EDCA_AC_VO] = edca->acvo;
 
-	if (pMac->roam.configParam.enable_edca_params) {
+	vdev = wlan_objmgr_get_vdev_by_id_from_psoc(pMac->psoc,
+						    session->smeSessionId,
+						    WLAN_LEGACY_MAC_ID);
+	if (vdev) {
+		vdev_mlme = wlan_vdev_mlme_get_priv_obj(vdev);
+		if (vdev_mlme)
+			follow_ap_edca = vdev_mlme->follow_ap_edca;
+		wlan_objmgr_vdev_release_ref(vdev, WLAN_LEGACY_MAC_ID);
+	}
+
+	if (pMac->roam.configParam.enable_edca_params && !follow_ap_edca) {
 		session->gLimEdcaParams[EDCA_AC_VO].aci.aifsn =
 			pMac->roam.configParam.edca_vo_aifs;
 		session->gLimEdcaParams[EDCA_AC_VI].aci.aifsn =
@@ -1271,15 +1274,15 @@ sch_beacon_edca_process(tpAniSirGlobal pMac, tSirMacEdcaParamSetIE *edca,
 	}
 	WLAN_HOST_DIAG_LOG_REPORT(log_ptr);
 #endif /* FEATURE_WLAN_DIAG_SUPPORT */
-	pe_debug("Edsa param enabled in ini %d. Updating Local EDCA Params(gLimEdcaParams) to: ",
+	pe_debug("Edsa param enabled %d. Updating Local Params to: ",
 		pMac->roam.configParam.enable_edca_params);
 	for (i = 0; i < MAX_NUM_AC; i++) {
-		pe_debug("AC[%d]:  AIFSN: %d, ACM %d, CWmin %d, CWmax %d, TxOp %d",
-		       i, session->gLimEdcaParams[i].aci.aifsn,
-		       session->gLimEdcaParams[i].aci.acm,
-		       session->gLimEdcaParams[i].cw.min,
-		       session->gLimEdcaParams[i].cw.max,
-		       session->gLimEdcaParams[i].txoplimit);
+		pe_nofl_debug("AC[%d]:  AIFSN: %d, ACM %d, CWmin %d, CWmax %d, TxOp %d",
+			      i, session->gLimEdcaParams[i].aci.aifsn,
+			      session->gLimEdcaParams[i].aci.acm,
+			      session->gLimEdcaParams[i].cw.min,
+			      session->gLimEdcaParams[i].cw.max,
+			      session->gLimEdcaParams[i].txoplimit);
 	}
 	return QDF_STATUS_SUCCESS;
 }

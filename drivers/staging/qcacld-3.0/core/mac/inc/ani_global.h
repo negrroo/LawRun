@@ -732,7 +732,7 @@ typedef struct sAniSirLim {
 	QDF_STATUS(*sme_msg_callback)
 		(tpAniSirGlobal mac, struct scheduler_msg *msg);
 	QDF_STATUS(*stop_roaming_callback)
-		(tpAniSirGlobal mac, uint8_t session_id, uint8_t reason);
+		(tHalHandle mac, uint8_t session_id, uint8_t reason);
 	uint8_t retry_packet_cnt;
 	uint8_t beacon_probe_rsp_cnt_per_scan;
 	wlan_scan_requester req_id;
@@ -815,6 +815,14 @@ struct mgmt_beacon_probe_filter {
 	uint8_t sap_channel[SIR_MAX_SUPPORTED_BSS];
 };
 
+#ifdef FEATURE_ANI_LEVEL_REQUEST
+struct ani_level_params {
+	void (*ani_level_cb)(struct wmi_host_ani_level_event *ani, uint8_t num,
+			     void *context);
+	void *context;
+};
+#endif
+
 /* ------------------------------------------------------------------- */
 /* / MAC Sirius parameter structure */
 typedef struct sAniSirGlobal {
@@ -889,6 +897,11 @@ typedef struct sAniSirGlobal {
 	bool bcn_reception_stats;
 	/* Beacon stats enabled/disabled from ini */
 	bool enable_beacon_reception_stats;
+	uint32_t akm_service_bitmap;
+	bool is_adaptive_11r_roam_supported;
+#ifdef FEATURE_ANI_LEVEL_REQUEST
+	struct ani_level_params ani_params;
+#endif
 } tAniSirGlobal;
 
 #ifdef FEATURE_WLAN_TDLS

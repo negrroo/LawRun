@@ -181,7 +181,6 @@ static void sde_crtc_calc_fps(struct sde_crtc *sde_crtc)
 	sde_crtc->fps_info.time_buf[sde_crtc->fps_info.next_time_index++] =
 								ktime_get();
 	sde_crtc->fps_info.next_time_index %= MAX_FRAME_COUNT;
-
 }
 
 /**
@@ -4433,17 +4432,6 @@ static void sde_crtc_disable(struct drm_crtc *crtc)
 	}
 	sde_crtc->enabled = false;
 
-	/* Below parameters are for fps calculation for sysfs node */
-	sde_crtc->fps_info.fps_periodic_duration = DEFAULT_FPS_PERIOD_1_SEC;
-	sde_crtc->fps_info.time_buf = kmalloc_array(MAX_FRAME_COUNT,
-			sizeof(sde_crtc->fps_info.time_buf), GFP_KERNEL);
-
-	if (!sde_crtc->fps_info.time_buf)
-		SDE_ERROR("invalid buffer\n");
-	else
-		memset(sde_crtc->fps_info.time_buf, 0,
-			sizeof(*(sde_crtc->fps_info.time_buf)));
-
 	if (atomic_read(&sde_crtc->frame_pending)) {
 		SDE_ERROR("crtc%d frame_pending%d\n", crtc->base.id,
 				atomic_read(&sde_crtc->frame_pending));
@@ -6330,6 +6318,17 @@ struct drm_crtc *sde_crtc_init(struct drm_device *dev, struct drm_plane *plane)
 	INIT_LIST_HEAD(&sde_crtc->rp_head);
 
 	sde_crtc->enabled = false;
+
+	/* Below parameters are for fps calculation for sysfs node */
+	sde_crtc->fps_info.fps_periodic_duration = DEFAULT_FPS_PERIOD_1_SEC;
+	sde_crtc->fps_info.time_buf = kmalloc_array(MAX_FRAME_COUNT,
+			sizeof(sde_crtc->fps_info.time_buf), GFP_KERNEL);
+
+	if (!sde_crtc->fps_info.time_buf)
+		SDE_ERROR("invalid buffer\n");
+	else
+		memset(sde_crtc->fps_info.time_buf, 0,
+			sizeof(*(sde_crtc->fps_info.time_buf)));
 
 	INIT_LIST_HEAD(&sde_crtc->frame_event_list);
 	INIT_LIST_HEAD(&sde_crtc->user_event_list);

@@ -147,7 +147,6 @@ struct sde_crtc_event {
 	void (*cb_func)(struct drm_crtc *crtc, void *usr);
 	void *usr;
 };
-
 /**
  * struct sde_crtc_fps_info - structure for measuring fps periodicity
  * @frame_count		: Total frames during configured periodic duration
