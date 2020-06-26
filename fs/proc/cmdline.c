@@ -34,12 +34,14 @@ static void remove_flag(char *cmd, const char *flag)
 		if (end_addr)
 			memmove(start_addr, end_addr + 1, strlen(end_addr));
 		else
-			*(max(cmd, start_addr - 1)) = '\0';
+			*(start_addr - 1) = '\0';
 	}
 }
 
 static void remove_safetynet_flags(char *cmd)
 {
+	remove_flag(cmd, "androidboot.enable_dm_verity=");
+	remove_flag(cmd, "androidboot.secboot=");
 	remove_flag(cmd, "androidboot.verifiedbootstate=");
 	remove_flag(cmd, "androidboot.veritymode=");
 }
