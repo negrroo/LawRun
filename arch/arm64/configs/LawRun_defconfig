@@ -4571,7 +4571,7 @@ CONFIG_SENSORS_SSC=y
 # Halls
 #
 # CONFIG_HALLS is not set
-# CONFIG_AINUR_DTS_SW is not set
+CONFIG_AINUR_DTS_SW=y
 
 #
 # Firmware Drivers
