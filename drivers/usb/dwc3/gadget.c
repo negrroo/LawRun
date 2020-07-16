@@ -2007,21 +2007,6 @@ static int dwc3_gadget_run_stop(struct dwc3 *dwc, int is_on, int suspend)
 		dwc3_notify_event(dwc, DWC3_GSI_EVT_BUF_CLEAR, 0);
 	}
 
-	dwc3_writel(dwc->regs, DWC3_DCTL, reg);
-
-	/* Controller is not halted until the events are acknowledged */
-	if (!is_on) {
-		/*
-		 * Clear out any pending events (i.e. End Transfer Command
-		 * Complete).
-		 */
-		reg1 = dwc3_readl(dwc->regs, DWC3_GEVNTCOUNT(0));
-		reg1 &= DWC3_GEVNTCOUNT_MASK;
-		dbg_log_string("remaining EVNTCOUNT(0)=%d", reg1);
-		dwc3_writel(dwc->regs, DWC3_GEVNTCOUNT(0), reg1);
-		dwc3_notify_event(dwc, DWC3_GSI_EVT_BUF_CLEAR, 0);
-	}
-
 	do {
 		reg = dwc3_readl(dwc->regs, DWC3_DSTS);
 		reg &= DWC3_DSTS_DEVCTRLHLT;
@@ -2750,15 +2735,17 @@ static void dwc3_gsi_ep_transfer_complete(struct dwc3 *dwc, struct dwc3_ep *dep)
 	struct dwc3_trb *trb;
 	dma_addr_t offset;
 
-	/*
-	 * Doorbell needs to be rung with the next TRB that is going to be
-	 * processed by hardware.
-	 * So, if 'n'th TRB got completed then ring doorbell with (n+1) TRB.
-	 */
-	dwc3_ep_inc_trb(dep, &dep->trb_dequeue);
 	trb = &dep->trb_pool[dep->trb_dequeue];
-	offset = dwc3_trb_dma_offset(dep, trb);
-	usb_gsi_ep_op(ep, (void *)&offset, GSI_EP_OP_UPDATE_DB);
+	while (trb->ctrl & DWC3_TRBCTL_LINK_TRB) {
+		dwc3_ep_inc_trb(dep, &dep->trb_dequeue);
+		trb = &dep->trb_pool[dep->trb_dequeue];
+	}
+
+	if (!(trb->ctrl & DWC3_TRB_CTRL_HWO)) {
+		offset = dwc3_trb_dma_offset(dep, trb);
+		usb_gsi_ep_op(ep, (void *)&offset, GSI_EP_OP_UPDATE_DB);
+		dwc3_ep_inc_trb(dep, &dep->trb_dequeue);
+	}
 }
 
 static void dwc3_endpoint_transfer_complete(struct dwc3 *dwc,

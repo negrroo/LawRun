@@ -461,7 +461,7 @@ struct mhi_dev_channel {
 	uint32_t			tre_bytes_left;
 	/* td size being read/written from/to so far */
 	uint32_t			td_size;
-	uint32_t			pend_wr_count;
+	bool				wr_request_active;
 	bool				skip_td;
 };
 

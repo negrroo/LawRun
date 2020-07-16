@@ -307,7 +307,6 @@
 	};
 
 	prim_slave: prim_slave_pinctrl {
-		status = "disabled";
 		compatible = "qcom,msm-cdc-pinctrl";
 		pinctrl-names = "aud_active", "aud_sleep";
 		pinctrl-0 = <&pri_ws_active_slave
@@ -336,7 +335,6 @@
 	};
 
 	sec_slave: sec_slave_pinctrl {
-		status = "disabled";
 		compatible = "qcom,msm-cdc-pinctrl";
 		pinctrl-names = "aud_active", "aud_sleep";
 		pinctrl-0 = <&sec_ws_active_slave

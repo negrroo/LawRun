@@ -1006,7 +1006,9 @@ static int set_config(struct usb_composite_dev *cdev,
 		usb_gadget_clear_selfpowered(gadget);
 
 	usb_gadget_vbus_draw(gadget, power);
+
 done:
+
 	if (result >= 0 && cdev->delayed_status)
 		result = USB_GADGET_DELAYED_STATUS;
 	return result;

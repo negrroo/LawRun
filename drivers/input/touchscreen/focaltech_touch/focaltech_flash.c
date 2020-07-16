@@ -1484,21 +1484,6 @@ static int fts_fwupg_get_ver_in_host(u8 *ver)
 	return 0;
 }
 
-static int check_chip_id(u8 chip_id1, u8 chip_id2)
-{
-#if FTS_CHIP_IDC
-	if ((chip_id1 == chip_types.chip_idh)
-			&& (chip_id2 == chip_types.chip_idl) {
-#else
-	if (chip_id1 == chip_types.chip_idh) {
-#endif
-		return 1;
-	}
-	return 0;
-}
-
-#if (!(FTS_UPGRADE_STRESS_TEST))
-
 /************************************************************************
  * fts_fwupg_need_upgrade - check fw need upgrade or not
  *
@@ -1532,18 +1517,12 @@ static bool fts_fwupg_need_upgrade(struct i2c_client *client)
 			return false;
 		}
 
-<<<<<<< HEAD
 		ts_data->fw_ver_in_tp = fw_ver_in_tp;
 		ts_data->fw_ver_in_host = fw_ver_in_host;
 
 		FTS_INFO("fw version in tp:%x, host:%x", fw_ver_in_tp, fw_ver_in_host);
 		if (fw_ver_in_tp != fw_ver_in_host) {
 			return true;
-=======
-		if (check_chip_id(chip_id1, chip_id2)) {
-			fw_status = FTS_RUN_IN_APP;
-			break;
->>>>>>> c7b51680e0f0... touchschreen/focaltech_flash: Refactor and simplify chipid check
 		}
 	} else {
 		FTS_INFO("fw invalid, need upgrade fw");

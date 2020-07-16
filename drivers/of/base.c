@@ -171,6 +171,7 @@ static int __init of_free_phandle_cache(void)
 
 	kfree(phandle_cache);
 	phandle_cache = NULL;
+
 	if (!of_kset)
 		return 0;
 

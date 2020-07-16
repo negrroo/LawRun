@@ -2861,7 +2861,7 @@ static int sd_revalidate_disk(struct gendisk *disk)
 	if (sd_validate_opt_xfer_size(sdkp, dev_max)) {
 		rw_max = q->limits.io_opt =
 						sdkp->opt_xfer_blocks * sdp->sector_size;
-		q->limits.io_opt = logical_to_bytes(sdp, sdkp->opt_xfer_blocks);
+		q->limits.io_opt = logical_to_sectors(sdp, sdkp->opt_xfer_blocks);
 		rw_max = logical_to_sectors(sdp, sdkp->opt_xfer_blocks);
 	} else {
 		q->limits.io_opt = 0;

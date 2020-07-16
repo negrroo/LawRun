@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2018,2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,33 +24,6 @@
 #include "cam_req_mgr_dev.h"
 
 static struct cam_req_mgr_core_device *g_crm_core_dev;
-static struct cam_req_mgr_core_link g_links[MAXIMUM_LINKS_PER_SESSION];
-
-static void cam_req_mgr_core_link_reset(struct cam_req_mgr_core_link *link)
-{
-	link->link_hdl = 0;
-	link->num_devs = 0;
-	link->max_delay = CAM_PIPELINE_DELAY_0;
-	link->workq = NULL;
-	link->pd_mask = 0;
-	link->l_dev = NULL;
-	link->req.in_q = NULL;
-	link->req.l_tbl = NULL;
-	link->req.num_tbl = 0;
-	link->watchdog = NULL;
-	link->state = CAM_CRM_LINK_STATE_AVAILABLE;
-	link->parent = NULL;
-	link->subscribe_event = 0;
-	link->trigger_mask = 0;
-	link->sync_link = NULL;
-	link->sof_counter = 0;
-	link->sync_self_ref = 0;
-	link->frame_skip_flag = false;
-	link->sync_link_sof_skip = false;
-	link->open_req_cnt = 0;
-	link->last_flush_id = 0;
-	link->num_sof_src = 0;
-}
 
 void cam_req_mgr_handle_core_shutdown(void)
 {
@@ -1365,25 +1338,25 @@ static struct cam_req_mgr_core_link *__cam_req_mgr_reserve_link(
 			session->num_links, MAXIMUM_LINKS_PER_SESSION);
 		return NULL;
 	}
-	for (i = 0; i < MAXIMUM_LINKS_PER_SESSION; i++) {
-		if (!atomic_cmpxchg(&g_links[i].is_used, 0, 1)) {
-			link = &g_links[i];
-			CAM_DBG(CAM_CRM, "alloc link index %d", i);
-			cam_req_mgr_core_link_reset(link);
-			break;
-		}
-	}
-	if (i == MAXIMUM_LINKS_PER_SESSION)
-		return NULL;
 
+	link = (struct cam_req_mgr_core_link *)
+		kzalloc(sizeof(struct cam_req_mgr_core_link), GFP_KERNEL);
+	if (!link) {
+		CAM_ERR(CAM_CRM, "failed to create link, no mem");
+		return NULL;
+	}
 	in_q = (struct cam_req_mgr_req_queue *)
 		kzalloc(sizeof(struct cam_req_mgr_req_queue), GFP_KERNEL);
 	if (!in_q) {
 		CAM_ERR(CAM_CRM, "failed to create input queue, no mem");
+		kfree(link);
 		return NULL;
 	}
+	mutex_init(&link->lock);
+	spin_lock_init(&link->link_state_spin_lock);
 
 	mutex_lock(&link->lock);
+	link->state = CAM_CRM_LINK_STATE_AVAILABLE;
 	link->num_devs = 0;
 	link->max_delay = 0;
 	memset(in_q->slot, 0,
@@ -1420,6 +1393,7 @@ static struct cam_req_mgr_core_link *__cam_req_mgr_reserve_link(
 	return link;
 error:
 	mutex_unlock(&session->lock);
+	kfree(link);
 	kfree(in_q);
 	return NULL;
 }
@@ -1434,12 +1408,9 @@ error:
  */
 static void __cam_req_mgr_free_link(struct cam_req_mgr_core_link *link)
 {
-	ptrdiff_t i;
 	kfree(link->req.in_q);
 	link->req.in_q = NULL;
-	i = link - g_links;
-	CAM_DBG(CAM_CRM, "free link index %d", i);
-	atomic_set(&g_links[i].is_used, 0);
+	kfree(link);
 }
 
 /**
@@ -2111,8 +2082,6 @@ static int cam_req_mgr_cb_notify_trigger(
 	struct cam_req_mgr_core_link    *link = NULL;
 	struct cam_req_mgr_trigger_notify   *notify_trigger;
 	struct crm_task_payload         *task_data;
-	bool   send_sof = true;
-	int    i = 0;
 
 	if (!trigger_data) {
 		CAM_ERR(CAM_CRM, "sof_data is NULL");
@@ -2127,24 +2096,6 @@ static int cam_req_mgr_cb_notify_trigger(
 		rc = -EINVAL;
 		goto end;
 	}
-	for (i = 0; i < link->num_sof_src; i++) {
-		if (link->dev_sof_evt[i].dev_hdl == trigger_data->dev_hdl) {
-			if (link->dev_sof_evt[i].sof_done == false)
-				link->dev_sof_evt[i].sof_done = true;
-			else
-				CAM_DBG(CAM_CRM, "Received Surious SOF");
-
-		} else if (link->dev_sof_evt[i].sof_done == false) {
-			send_sof = false;
-		}
-
-	}
-
-	if (!send_sof)
-		return 0;
-
-	for (i = 0; i < link->num_sof_src; i++)
-		link->dev_sof_evt[i].sof_done = false;
 
 	spin_lock_bh(&link->link_state_spin_lock);
 	if (link->state < CAM_CRM_LINK_STATE_READY) {
@@ -2256,12 +2207,6 @@ static int __cam_req_mgr_setup_link_info(struct cam_req_mgr_core_link *link,
 				max_delay = dev->dev_info.p_delay;
 
 			subscribe_event |= (uint32_t)dev->dev_info.trigger;
-		}
-		if (dev->dev_info.dev_id == CAM_REQ_MGR_DEVICE_IFE) {
-			link->dev_sof_evt[link->num_sof_src].dev_hdl =
-				dev->dev_hdl;
-			link->dev_sof_evt[link->num_sof_src].sof_done = false;
-			link->num_sof_src++;
 		}
 	}
 
@@ -2915,7 +2860,6 @@ end:
 
 int cam_req_mgr_core_device_init(void)
 {
-	int i;
 	CAM_DBG(CAM_CRM, "Enter g_crm_core_dev %pK", g_crm_core_dev);
 
 	if (g_crm_core_dev) {
@@ -2932,12 +2876,6 @@ int cam_req_mgr_core_device_init(void)
 	mutex_init(&g_crm_core_dev->crm_lock);
 	cam_req_mgr_debug_register(g_crm_core_dev);
 
-	for (i = 0; i < MAXIMUM_LINKS_PER_SESSION; i++) {
-		mutex_init(&g_links[i].lock);
-		spin_lock_init(&g_links[i].link_state_spin_lock);
-		atomic_set(&g_links[i].is_used, 0);
-		cam_req_mgr_core_link_reset(&g_links[i]);
-	}
 	return 0;
 }
 

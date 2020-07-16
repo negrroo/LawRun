@@ -28,6 +28,7 @@
 #include <linux/micrel_phy.h>
 #include <linux/of.h>
 #include <linux/clk.h>
+#include <linux/delay.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
@@ -1238,4 +1239,3 @@ static struct mdio_device_id __maybe_unused micrel_tbl[] = {
 };
 
 MODULE_DEVICE_TABLE(mdio, micrel_tbl);
-

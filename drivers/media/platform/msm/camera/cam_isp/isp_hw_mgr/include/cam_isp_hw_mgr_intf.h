@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -131,7 +131,6 @@ struct cam_isp_prepare_hw_update_data {
 struct cam_isp_hw_sof_event_data {
 	uint64_t       timestamp;
 	uint64_t       boot_time;
-	uint64_t       irq_mono_boot_time;
 };
 
 /**
@@ -143,7 +142,6 @@ struct cam_isp_hw_sof_event_data {
  */
 struct cam_isp_hw_reg_update_event_data {
 	uint64_t       timestamp;
-	uint64_t       irq_mono_boot_time;
 };
 
 /**
@@ -154,7 +152,6 @@ struct cam_isp_hw_reg_update_event_data {
  */
 struct cam_isp_hw_epoch_event_data {
 	uint64_t       timestamp;
-	uint64_t       irq_mono_boot_time;
 };
 
 /**
@@ -170,7 +167,6 @@ struct cam_isp_hw_done_event_data {
 	uint32_t             resource_handle[
 				CAM_NUM_OUT_PER_COMP_IRQ_MAX];
 	uint64_t       timestamp;
-	uint64_t       irq_mono_boot_time;
 };
 
 /**
@@ -181,7 +177,6 @@ struct cam_isp_hw_done_event_data {
  */
 struct cam_isp_hw_eof_event_data {
 	uint64_t       timestamp;
-	uint64_t       irq_mono_boot_time;
 };
 
 /**
@@ -202,7 +197,6 @@ enum cam_isp_hw_mgr_command {
 	CAM_ISP_HW_MGR_CMD_PAUSE_HW,
 	CAM_ISP_HW_MGR_CMD_RESUME_HW,
 	CAM_ISP_HW_MGR_CMD_SOF_DEBUG,
-	CAM_ISP_HW_MGR_CMD_GET_TIMESTAMP_TH,
 	CAM_ISP_HW_MGR_CMD_MAX,
 };
 

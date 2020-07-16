@@ -1878,8 +1878,7 @@ static int diag_dci_process_apps_pkt(struct diag_pkt_header_t *pkt_header,
 							DIAG_MAX_REQ_SIZE;
 			write_len += sizeof(uint32_t);
 		} else if (ss_cmd_code == DIAG_DIAG_STM) {
-			write_len = diag_process_stm_cmd(req_buf, req_len,
-				payload_ptr);
+			write_len = diag_process_stm_cmd(req_buf, payload_ptr);
 		}
 	} else if (subsys_id == DIAG_SS_PARAMS) {
 		if (ss_cmd_code == DIAG_DIAG_POLL) {
@@ -1973,8 +1972,7 @@ static int diag_process_dci_pkt_rsp(unsigned char *buf, int len)
 	if (!buf)
 		return -EIO;
 
-	if (len < (sizeof(struct dci_pkt_req_t) +
-		sizeof(struct diag_pkt_header_t)) ||
+	if (len < sizeof(struct dci_pkt_req_t) ||
 		len > DCI_REQ_BUF_SIZE) {
 		pr_err("diag: dci: Invalid length %d len in %s", len, __func__);
 		return -EIO;
@@ -1985,13 +1983,6 @@ static int diag_process_dci_pkt_rsp(unsigned char *buf, int len)
 	read_len += sizeof(struct dci_pkt_req_t);
 	req_len -= sizeof(struct dci_pkt_req_t);
 	req_buf = temp; /* Start of the Request */
-	header = (struct diag_pkt_header_t *)temp;
-	read_len += sizeof(struct diag_pkt_header_t);
-	if (read_len >= DCI_REQ_BUF_SIZE) {
-		pr_err("diag: dci: In %s, invalid read_len: %d\n", __func__,
-		       read_len);
-		return -EIO;
-	}
 
 	mutex_lock(&driver->dci_mutex);
 	dci_entry = diag_dci_get_client_entry(req_hdr.client_id);

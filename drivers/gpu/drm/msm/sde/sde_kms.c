@@ -1319,7 +1319,6 @@ static int _sde_kms_setup_displays(struct drm_device *dev,
 		.cmd_transfer = NULL,
 		.cont_splash_config = NULL,
 		.get_panel_vfp = NULL,
-		.mode_needs_full_range = dp_connector_mode_needs_full_range,
 	};
 	static const struct sde_connector_ops ext_bridge_ops = {
 		.set_info_blob = dsi_conn_set_info_blob,
@@ -1331,7 +1330,7 @@ static int _sde_kms_setup_displays(struct drm_device *dev,
 		.get_dst_format = dsi_display_get_dst_format,
 		.enable_event = dsi_conn_enable_event,
 		.cmd_transfer = NULL,
-		.cont_splash_config = dsi_display_cont_splash_config,
+		.cont_splash_config = NULL,
 	};
 	struct msm_display_info info;
 	struct drm_encoder *encoder;

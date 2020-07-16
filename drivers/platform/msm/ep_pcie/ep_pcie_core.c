@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -33,7 +33,6 @@
 #include <linux/msm-bus-board.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
-#include <soc/qcom/boot_stats.h>
 
 #include "ep_pcie_com.h"
 
@@ -557,6 +556,7 @@ static void ep_pcie_config_mmio(struct ep_pcie_dev_t *dev)
 	ep_pcie_write_reg(dev->mmio, PCIE20_MHIVER, 0x1000000);
 	ep_pcie_write_reg(dev->mmio, PCIE20_BHI_VERSION_LOWER, 0x2);
 	ep_pcie_write_reg(dev->mmio, PCIE20_BHI_VERSION_UPPER, 0x1);
+	ep_pcie_write_reg(dev->mmio, PCIE20_BHI_INTVEC, 0xffffffff);
 
 	dev->config_mmio_init = true;
 }
@@ -614,7 +614,7 @@ static void ep_pcie_core_init(struct ep_pcie_dev_t *dev, bool configured)
 		EP_PCIE_DBG2(dev, "PCIe V%d: Enable L1.\n", dev->rev);
 		ep_pcie_write_mask(dev->parf + PCIE20_PARF_PM_CTRL, BIT(5), 0);
 
-		ep_pcie_write_reg(dev->parf + PCIE20_PARF_SLV_ADDR_MSB_CTRL,
+		ep_pcie_write_mask(dev->parf + PCIE20_PARF_SLV_ADDR_MSB_CTRL,
 					0, BIT(0));
 		ep_pcie_write_reg(dev->parf, PCIE20_PARF_SLV_ADDR_SPACE_SIZE_HI,
 					0x200);
@@ -1549,8 +1549,6 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 		EP_PCIE_INFO(dev,
 			"PCIe V%d: link initialized for LE PCIe endpoint\n",
 			dev->rev);
-		place_marker(
-			"PCIe - link initialized for LE PCIe endpoint\n");
 	}
 
 checkbme:
@@ -1973,10 +1971,6 @@ static irqreturn_t ep_pcie_handle_perst_irq(int irq, void *data)
 	}
 
 out:
-	/* Set trigger type based on the next expected value of perst gpio */
-	irq_set_irq_type(gpio_to_irq(dev->gpio[EP_PCIE_GPIO_PERST].num),
-		(perst ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH));
-
 	spin_unlock_irqrestore(&dev->isr_lock, irqsave_flags);
 
 	return IRQ_HANDLED;
@@ -2160,18 +2154,11 @@ int32_t ep_pcie_irq_init(struct ep_pcie_dev_t *dev)
 	}
 
 perst_irq:
-	/*
-	 * Check initial state of perst gpio to set the trigger type
-	 * based on the next expected level of the gpio
-	 */
-	if (gpio_get_value(dev->gpio[EP_PCIE_GPIO_PERST].num) == 1)
-		dev->perst_deast = true;
-
 	/* register handler for PERST interrupt */
 	perst_irq = gpio_to_irq(dev->gpio[EP_PCIE_GPIO_PERST].num);
 	ret = devm_request_irq(pdev, perst_irq,
 		ep_pcie_handle_perst_irq,
-		(dev->perst_deast ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH),
+		IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING,
 		"ep_pcie_perst", dev);
 	if (ret) {
 		EP_PCIE_ERR(dev,
@@ -2515,36 +2502,9 @@ int ep_pcie_core_trigger_msi(u32 idx)
 	return EP_PCIE_ERROR;
 }
 
-static void ep_pcie_core_issue_inband_pme(void)
+int ep_pcie_core_wakeup_host(void)
 {
 	struct ep_pcie_dev_t *dev = &ep_pcie_dev;
-	unsigned long irqsave_flags;
-	u32 pm_ctrl = 0;
-
-	spin_lock_irqsave(&dev->isr_lock, irqsave_flags);
-
-	EP_PCIE_DBG(dev,
-		"PCIe V%d: request to assert inband wake\n",
-		dev->rev);
-
-	pm_ctrl = readl_relaxed(dev->parf + PCIE20_PARF_PM_CTRL);
-	ep_pcie_write_reg(dev->parf, PCIE20_PARF_PM_CTRL,
-						(pm_ctrl | BIT(4)));
-	ep_pcie_write_reg(dev->parf, PCIE20_PARF_PM_CTRL, pm_ctrl);
-
-	EP_PCIE_DBG(dev,
-		"PCIe V%d: completed assert for inband wake\n",
-		dev->rev);
-
-	spin_unlock_irqrestore(&dev->isr_lock, irqsave_flags);
-}
-
-static int ep_pcie_core_wakeup_host(enum ep_pcie_event event)
-{
-	struct ep_pcie_dev_t *dev = &ep_pcie_dev;
-
-	if (event == EP_PCIE_EVENT_PM_D3_HOT)
-		ep_pcie_core_issue_inband_pme();
 
 	if (dev->perst_deast && !dev->l23_ready) {
 		EP_PCIE_ERR(dev,
