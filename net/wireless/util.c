@@ -1770,6 +1770,7 @@ bool cfg80211_is_gratuitous_arp_unsolicited_na(struct sk_buff *skb)
 	return false;
 }
 EXPORT_SYMBOL(cfg80211_is_gratuitous_arp_unsolicited_na);
+
 /* Layer 2 Update frame (802.2 Type 1 LLC XID Update response) */
 struct iapp_layer2_update {
 	u8 da[ETH_ALEN];	/* broadcast */
