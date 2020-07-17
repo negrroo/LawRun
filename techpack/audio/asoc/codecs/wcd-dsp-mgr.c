@@ -405,7 +405,9 @@ static int wdsp_download_segments(struct wdsp_mgr_priv *wdsp,
 
 	ret = wdsp_get_segment_list(ctl->cdev, wdsp->img_fname,
 				    type, wdsp->seg_list, &wdsp->base_addr);
+
 	pr_info("%s: downloading wdsp firmware: %s.\n", __func__, wdsp->img_fname);
+
 	if (ret < 0 ||
 	    list_empty(wdsp->seg_list)) {
 		WDSP_ERR(wdsp, "Error %d to get image segments for type %d",
@@ -1243,7 +1245,8 @@ static int wdsp_mgr_parse_dt_entries(struct wdsp_mgr_priv *wdsp)
 
 	ret = of_property_read_string(dev->of_node, "qcom,img-filename",
 				      &wdsp->img_fname);
-	wdsp->img_fname  = "cpe_intl";
+
+	wdsp->img_fname = "cpe_intl";
 	pr_info("%s: using global wdsp fw: %s.\n", __func__, wdsp->img_fname);
 
 	if (ret < 0) {

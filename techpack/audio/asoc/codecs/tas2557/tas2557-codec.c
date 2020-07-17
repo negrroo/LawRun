@@ -1,7 +1,6 @@
 /*
 ** =============================================================================
 ** Copyright (c) 2016  Texas Instruments Inc.
-** Copyright (C) 2019 XiaoMi, Inc.
 **
 ** This program is free software; you can redistribute it and/or modify it under
 ** the terms of the GNU General Public License as published by the Free Software
@@ -22,7 +21,6 @@
 
 #ifdef CONFIG_TAS2557_CODEC
 
-#define DEBUG
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
@@ -45,6 +43,7 @@
 #include <sound/soc.h>
 #include <sound/initval.h>
 #include <sound/tlv.h>
+#include <soc/qcom/socinfo.h>
 
 #include "tas2557-core.h"
 #include "tas2557-codec.h"

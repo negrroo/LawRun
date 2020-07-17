@@ -93,6 +93,13 @@ static int32_t aprv2_core_fn_q(struct apr_client_data *data, void *priv)
 		}
 
 		payload1 = data->payload;
+
+		if (data->payload_size < 2 * sizeof(uint32_t)) {
+			pr_err("%s: payload has invalid size %d\n",
+				__func__, data->payload_size);
+			return -EINVAL;
+		}
+
 		switch (payload1[0]) {
 		case AVCS_CMD_REMOTE_AVTIMER_RELEASE_REQUEST:
 			pr_debug("%s: Cmd = TIMER RELEASE status[0x%x]\n",
@@ -112,12 +119,17 @@ static int32_t aprv2_core_fn_q(struct apr_client_data *data, void *priv)
 		avtimer.core_handle_q = NULL;
 		avtimer.avtimer_open_cnt = 0;
 		atomic_set(&avtimer.adsp_ready, 0);
-		schedule_delayed_work(&avtimer.ssr_dwork,
+		queue_delayed_work(system_power_efficient_wq, &avtimer.ssr_dwork,
 				  msecs_to_jiffies(SSR_WAKETIME));
 		break;
 	}
 
 	case AVCS_CMD_RSP_REMOTE_AVTIMER_VOTE_REQUEST:
+		if (data->payload_size < sizeof(uint32_t)) {
+			pr_err("%s: payload has invalid size %d\n",
+				__func__, data->payload_size);
+			return -EINVAL;
+		}
 		payload1 = data->payload;
 		pr_debug("%s: RSP_REMOTE_AVTIMER_VOTE_REQUEST handle %x\n",
 			__func__, payload1[0]);
@@ -281,7 +293,7 @@ static void reset_work(struct work_struct *work)
 	}
 	pr_debug("%s:Q6 not ready-retry after sometime\n", __func__);
 	if (--avtimer.num_retries > 0) {
-		schedule_delayed_work(&avtimer.ssr_dwork,
+		queue_delayed_work(system_power_efficient_wq, &avtimer.ssr_dwork,
 			  msecs_to_jiffies(Q6_READY_RETRY));
 	} else {
 		pr_err("%s: Q6 failed responding after multiple retries\n",
