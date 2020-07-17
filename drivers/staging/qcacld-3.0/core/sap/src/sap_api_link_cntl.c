@@ -253,8 +253,6 @@ QDF_STATUS wlansap_pre_start_bss_acs_scan_callback(tHalHandle hal_handle,
 	sap_config_acs_result(hal_handle, sap_ctx,
 			sap_ctx->acs_cfg->ht_sec_ch);
 
-	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
-		  FL("Channel selected = %d"), sap_ctx->channel);
 	sap_ctx->sap_state = eSAP_ACS_CHANNEL_SELECTED;
 	sap_ctx->sap_status = eSAP_STATUS_SUCCESS;
 close_session:
@@ -298,9 +296,9 @@ wlansap_roam_process_ch_change_success(tpAniSirGlobal mac_ctx,
 	 * Channel change is successful. If the new channel is a DFS channel,
 	 * then we will to perform channel availability check for 60 seconds
 	 */
-	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
-		  FL("sapdfs: changing target channel to [%d]"),
-		  mac_ctx->sap.SapDfsInfo.target_channel);
+	sap_nofl_debug("sapdfs: SAP CSA: freq to [%d] state %d",
+		       mac_ctx->sap.SapDfsInfo.target_channel,
+		       sap_ctx->fsm_state);
 	sap_ctx->channel = mac_ctx->sap.SapDfsInfo.target_channel;
 
 	/*
@@ -337,8 +335,6 @@ wlansap_roam_process_ch_change_success(tpAniSirGlobal mac_ctx,
 
 	/* check if currently selected channel is a DFS channel */
 	if (is_ch_dfs && sap_ctx->pre_cac_complete) {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED, FL(
-		    "sapdfs: SAP_STOPPING => SAP_STARTING, on pre cac"));
 		/* Start beaconing on the new pre cac channel */
 		wlansap_start_beacon_req(sap_ctx);
 		sap_ctx->fsm_state = SAP_STARTING;
@@ -350,22 +346,17 @@ wlansap_roam_process_ch_change_success(tpAniSirGlobal mac_ctx,
 	} else if (is_ch_dfs) {
 		if ((false == mac_ctx->sap.SapDfsInfo.ignore_cac)
 		    && (eSAP_DFS_DO_NOT_SKIP_CAC ==
-			mac_ctx->sap.SapDfsInfo.cac_state)) {
+			mac_ctx->sap.SapDfsInfo.cac_state) &&
+		    policy_mgr_get_dfs_master_dynamic_enabled(
+					mac_ctx->psoc,
+					sap_ctx->sessionId)) {
 			sap_ctx->fsm_state = SAP_INIT;
-			QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
-				  "%s: %d: sapdfs: from state SAP_STOPPING => DISCONNECTED with ignore cac false on sapctx[%pK]",
-				  __func__, __LINE__, sap_ctx);
 			/* DFS Channel */
 			sap_event.event = eSAP_DFS_CHANNEL_CAC_START;
 			sap_event.params = csr_roam_info;
 			sap_event.u1 = 0;
 			sap_event.u2 = 0;
 		} else {
-			QDF_TRACE(QDF_MODULE_ID_SAP,
-				  QDF_TRACE_LEVEL_INFO_MED,
-				  "%s: %d: sapdfs: from state SAP_STOPPING => SAP_STARTING with ignore cac true on sapctx[%pK]",
-				  __func__, __LINE__, sap_ctx);
-
 			/* Start beaconing on the new channel */
 			wlansap_start_beacon_req(sap_ctx);
 			sap_ctx->fsm_state = SAP_STARTING;
@@ -376,9 +367,6 @@ wlansap_roam_process_ch_change_success(tpAniSirGlobal mac_ctx,
 			sap_event.u2 = eCSR_ROAM_RESULT_INFRA_STARTED;
 		}
 	} else {
-		QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_MED,
-			  "%s: %d: sapdfs: from state SAP_STOPPING => SAP_STARTING on sapctx[%pK]",
-			  __func__, __LINE__, sap_ctx);
 		/* non-DFS channel */
 		sap_ctx->fsm_state = SAP_STARTING;
 		mac_ctx->sap.SapDfsInfo.sap_radar_found_status = false;
@@ -776,7 +764,6 @@ wlansap_roam_callback(void *ctx, struct csr_roam_info *csr_roam_info,
 	tHalHandle hal;
 	tpAniSirGlobal mac_ctx = NULL;
 	uint8_t intf;
-	bool sta_sap_scc_on_dfs_chan;
 
 	if (QDF_IS_STATUS_ERROR(wlansap_context_get(ctx)))
 		return QDF_STATUS_E_FAILURE;
@@ -794,9 +781,6 @@ wlansap_roam_callback(void *ctx, struct csr_roam_info *csr_roam_info,
 	QDF_TRACE(QDF_MODULE_ID_SAP, QDF_TRACE_LEVEL_INFO_HIGH,
 			FL("roam_status = %d, roam_result = %d"),
 			roam_status, roam_result);
-
-	sta_sap_scc_on_dfs_chan =
-		policy_mgr_is_sta_sap_scc_allowed_on_dfs_chan(mac_ctx->psoc);
 
 	switch (roam_status) {
 	case eCSR_ROAM_INFRA_IND:
@@ -880,7 +864,8 @@ wlansap_roam_callback(void *ctx, struct csr_roam_info *csr_roam_info,
 			  "Received Radar Indication on sap ch %d, session %d",
 			  sap_ctx->channel, sap_ctx->sessionId);
 
-		if (sta_sap_scc_on_dfs_chan) {
+		if (!policy_mgr_get_dfs_master_dynamic_enabled(
+				mac_ctx->psoc, sap_ctx->sessionId)) {
 			QDF_TRACE(QDF_MODULE_ID_SAP,
 				  QDF_TRACE_LEVEL_DEBUG,
 				  FL("Ignore the Radar indication"));
@@ -1184,7 +1169,8 @@ wlansap_roam_callback(void *ctx, struct csr_roam_info *csr_roam_info,
 
 		break;
 	case eCSR_ROAM_RESULT_DFS_RADAR_FOUND_IND:
-		if (sta_sap_scc_on_dfs_chan)
+		if (!policy_mgr_get_dfs_master_dynamic_enabled(
+				mac_ctx->psoc, sap_ctx->sessionId))
 			break;
 		wlansap_roam_process_dfs_radar_found(mac_ctx, sap_ctx,
 						&qdf_ret_status);

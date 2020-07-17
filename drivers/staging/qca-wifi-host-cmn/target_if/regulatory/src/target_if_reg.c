@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2017-2020 The Linux Foundation. All rights reserved.
  *
  *
  * Permission to use, copy, modify, and/or distribute this software for
@@ -181,7 +181,7 @@ clean:
 	qdf_mem_free(reg_info->reg_rules_5g_ptr);
 	qdf_mem_free(reg_info);
 
-	target_if_debug("processed reg channel list ret_val %d", ret_val);
+	TARGET_IF_EXIT();
 
 	return ret_val;
 }
@@ -277,7 +277,7 @@ static int tgt_reg_ch_avoid_event_handler(ol_scn_t handle,
 		return -EFAULT;
 	}
 
-	target_if_debug("processed CH avoid event");
+	TARGET_IF_EXIT();
 
 	return 0;
 }
@@ -413,6 +413,29 @@ static QDF_STATUS tgt_if_regulatory_stop_11d_scan(
 						  reg_stop_11d_scan_req);
 }
 
+/**
+ * tgt_if_regulatory_send_ctl_info() - Sends CTL info to firmware
+ * @psoc: Pointer to psoc
+ * @params: Pointer to argument list
+ *
+ * Return: QDF_STATUS
+ */
+static QDF_STATUS
+tgt_if_regulatory_send_ctl_info(struct wlan_objmgr_psoc *psoc,
+				struct reg_ctl_params *params)
+{
+	wmi_unified_t wmi_handle = get_wmi_unified_hdl_from_psoc(psoc);
+
+	if (!wmi_handle)
+		return QDF_STATUS_E_FAILURE;
+
+	return wmi_unified_send_regdomain_info_to_fw_cmd(wmi_handle,
+							 params->regd,
+							 params->regd_2g,
+							 params->regd_5g,
+							 params->ctl_2g,
+							 params->ctl_5g);
+}
 
 QDF_STATUS target_if_register_regulatory_tx_ops(struct wlan_lmac_if_tx_ops
 						*tx_ops)
@@ -452,6 +475,8 @@ QDF_STATUS target_if_register_regulatory_tx_ops(struct wlan_lmac_if_tx_ops
 
 	reg_ops->unregister_ch_avoid_event_handler =
 		tgt_if_regulatory_unregister_ch_avoid_event_handler;
+
+	reg_ops->send_ctl_info = tgt_if_regulatory_send_ctl_info;
 
 	return QDF_STATUS_SUCCESS;
 }

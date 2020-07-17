@@ -77,6 +77,7 @@
 #include "wlan_lmac_if_api.h"
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include <wlan_mlme_main.h>
+#include "wlan_pkt_capture_ucfg_api.h"
 
 struct wma_search_rate {
 	int32_t rate;
@@ -861,8 +862,7 @@ static void wma_data_tx_ack_work_handler(void *ack_work)
 
 	/* Call the Ack Cb registered by UMAC */
 	if (ack_cb)
-		ack_cb((tpAniSirGlobal) (wma_handle->mac_context), NULL,
-			work->status, NULL);
+		ack_cb(wma_handle->mac_context, NULL, work->status, NULL);
 	else
 		WMA_LOGE("Data Tx Ack Cb is NULL");
 
@@ -1196,8 +1196,6 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 		 params->state, params->selfMacAddr);
 	if ((params->state != eSIR_LINK_PREASSOC_STATE) &&
 	    (params->state != eSIR_LINK_DOWN_STATE)) {
-		WMA_LOGD("%s: unsupported link state %d",
-			 __func__, params->state);
 		params->status = false;
 		goto out;
 	}
@@ -2745,7 +2743,9 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	} else {
 		chanfreq = 0;
 	}
+
 	if (pMac->fEnableDebugLog & 0x1) {
+
 		if ((pFc->type == SIR_MAC_MGMT_FRAME) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_REQ) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_RSP)) {
@@ -2800,11 +2800,17 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 					WLAN_MGMT_NB_ID);
 	}
 
-	status = wlan_mgmt_txrx_mgmt_frame_tx(peer,
-			(tpAniSirGlobal)wma_handle->mac_context,
-			(qdf_nbuf_t)tx_frame,
-			NULL, tx_frm_ota_comp_cb,
-			WLAN_UMAC_COMP_MLME, &mgmt_param);
+	if (ucfg_pkt_capture_get_pktcap_mode() & PKT_CAPTURE_MODE_MGMT_ONLY) {
+		ucfg_pkt_capture_mgmt_tx(wma_handle->pdev,
+					 tx_frame,
+					 wma_handle->interfaces[vdev_id].mhz,
+					 mgmt_param.tx_param.preamble_type);
+	}
+
+	status = wlan_mgmt_txrx_mgmt_frame_tx(peer, wma_handle->mac_context,
+					      (qdf_nbuf_t)tx_frame,
+					      NULL, tx_frm_ota_comp_cb,
+					      WLAN_UMAC_COMP_MLME, &mgmt_param);
 
 	wlan_objmgr_peer_release_ref(peer, WLAN_MGMT_NB_ID);
 	if (status != QDF_STATUS_SUCCESS) {

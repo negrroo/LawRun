@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2013-2018, 2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -51,6 +51,9 @@
 #define PCIE_ACCESS_DUMP 4
 #endif
 #include "mp_dev.h"
+#ifdef HIF_CE_LOG_INFO
+#include "qdf_hang_event_notifier.h"
+#endif
 
 #if (defined(QCA_WIFI_QCA8074) || defined(QCA_WIFI_QCA6290)) && \
 	!defined(QCA_WIFI_SUPPORT_SRNG)
@@ -2099,6 +2102,7 @@ QDF_STATUS hif_post_recv_buffers_for_pipe(struct HIF_CE_pipe_info *pipe_info)
 	struct hif_softc *scn = HIF_GET_SOFTC(pipe_info->HIF_CE_state);
 	QDF_STATUS status;
 	uint32_t bufs_posted = 0;
+	unsigned int ce_id;
 
 	buf_sz = pipe_info->buf_sz;
 	if (buf_sz == 0) {
@@ -2107,6 +2111,7 @@ QDF_STATUS hif_post_recv_buffers_for_pipe(struct HIF_CE_pipe_info *pipe_info)
 	}
 
 	ce_hdl = pipe_info->ce_hdl;
+	ce_id = ((struct CE_state *)ce_hdl)->id;
 
 	qdf_spin_lock_bh(&pipe_info->recv_bufs_needed_lock);
 	while (atomic_read(&pipe_info->recv_bufs_needed) > 0) {
@@ -2116,6 +2121,9 @@ QDF_STATUS hif_post_recv_buffers_for_pipe(struct HIF_CE_pipe_info *pipe_info)
 		atomic_dec(&pipe_info->recv_bufs_needed);
 		qdf_spin_unlock_bh(&pipe_info->recv_bufs_needed_lock);
 
+		hif_record_ce_desc_event(scn, ce_id,
+					 HIF_RX_DESC_PRE_NBUF_ALLOC, NULL, NULL,
+					 0, 0);
 		nbuf = qdf_nbuf_alloc(scn->qdf_dev, buf_sz, 0, 4, false);
 		if (!nbuf) {
 			hif_post_recv_buffers_failure(pipe_info, nbuf,
@@ -2125,6 +2133,9 @@ QDF_STATUS hif_post_recv_buffers_for_pipe(struct HIF_CE_pipe_info *pipe_info)
 			return QDF_STATUS_E_NOMEM;
 		}
 
+		hif_record_ce_desc_event(scn, ce_id,
+					 HIF_RX_DESC_PRE_NBUF_MAP, NULL, nbuf,
+					 0, 0);
 		/*
 		 * qdf_nbuf_peek_header(nbuf, &data, &unused);
 		 * CE_data = dma_map_single(dev, data, buf_sz, );
@@ -2143,7 +2154,9 @@ QDF_STATUS hif_post_recv_buffers_for_pipe(struct HIF_CE_pipe_info *pipe_info)
 		}
 
 		CE_data = qdf_nbuf_get_frag_paddr(nbuf, 0);
-
+		hif_record_ce_desc_event(scn, ce_id,
+					 HIF_RX_DESC_POST_NBUF_MAP, NULL, nbuf,
+					 0, 0);
 		qdf_mem_dma_sync_single_for_device(scn->qdf_dev, CE_data,
 					       buf_sz, DMA_FROM_DEVICE);
 		status = ce_recv_buf_enqueue(ce_hdl, (void *)nbuf, CE_data);
@@ -3600,3 +3613,58 @@ int hif_get_wake_ce_id(struct hif_softc *scn, uint8_t *ce_id)
 
 	return 0;
 }
+
+#ifdef HIF_CE_LOG_INFO
+/**
+ * ce_get_index_info(): Get CE index info
+ * @scn: HIF Context
+ * @ce_state: CE opaque handle
+ * @info: CE info
+ *
+ * Return: 0 for success and non zero for failure
+ */
+static
+int ce_get_index_info(struct hif_softc *scn, void *ce_state,
+		      struct ce_index *info)
+{
+	struct HIF_CE_state *hif_state = HIF_GET_CE_STATE(scn);
+
+	return hif_state->ce_services->ce_get_index_info(scn, ce_state, info);
+}
+
+void hif_log_ce_info(struct hif_softc *scn, uint8_t *data,
+		     unsigned int *offset)
+{
+	struct hang_event_info info = {0};
+	static uint32_t tracked_ce = BIT(CE_ID_1) | BIT(CE_ID_2) |
+		BIT(CE_ID_3) | BIT(CE_ID_4) | BIT(CE_ID_9) | BIT(CE_ID_10);
+	uint8_t curr_index = 0;
+	uint8_t i;
+	uint16_t size;
+
+	info.active_tasklet_count = qdf_atomic_read(&scn->active_tasklet_cnt);
+	info.active_grp_tasklet_cnt =
+				qdf_atomic_read(&scn->active_grp_tasklet_cnt);
+
+	for (i = 0; i < scn->ce_count; i++) {
+		if (!(tracked_ce & BIT(i)) || !scn->ce_id_to_state[i])
+			continue;
+
+		if (ce_get_index_info(scn, scn->ce_id_to_state[i],
+				      &info.ce_info[curr_index]))
+			continue;
+
+		curr_index++;
+	}
+
+	info.ce_count = curr_index;
+	size = sizeof(info) -
+		(CE_COUNT_MAX - info.ce_count) * sizeof(struct ce_index);
+
+	QDF_HANG_EVT_SET_HDR(&info.tlv_header, HANG_EVT_TAG_CE_INFO,
+			     size - QDF_HANG_EVENT_TLV_HDR_SIZE);
+
+	qdf_mem_copy(data + *offset, &info, size);
+	*offset = *offset + size;
+}
+#endif
