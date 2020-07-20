@@ -147,6 +147,9 @@ struct nvt_ts_data {
 	struct mutex xbuf_lock;
 	bool irq_enabled;
 
+	bool palm_sensor_changed;
+	bool palm_sensor_switch;
+
 	size_t config_array_size;
 #if WAKEUP_GESTURE
 	int gesture_enabled;
@@ -200,6 +203,7 @@ extern int32_t nvt_check_fw_reset_state(RST_COMPLETE_STATE check_reset_state);
 extern int32_t nvt_get_fw_info(void);
 extern int32_t nvt_clear_fw_status(void);
 extern int32_t nvt_check_fw_status(void);
+int32_t nvt_set_pocket_palm_switch(uint8_t pocket_palm_switch);
 extern int32_t nvt_set_page(uint16_t i2c_addr, uint32_t addr);
 extern void nvt_stop_crc_reboot(void);
 
