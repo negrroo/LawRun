@@ -489,7 +489,7 @@
 		/*novatek,mp-support-dt;*/
 	};
 	focaltech@38 {
-		compatible = "focaltech,focal";
+		compatible = "focaltech,fts";
 		reg = <0x38>;
 		interrupt-parent = <&tlmm>;
 		interrupts = <31 0>;
