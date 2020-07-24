@@ -39,6 +39,12 @@
 		flash-source = <&pmi8998_flash2>;
 		torch-source = <&pmi8998_torch2>;
 		switch-source = <&pmi8998_switch1>;
+		gpios = <&tlmm 90 0>,
+			<&tlmm 40 0>;
+		gpio-req-tbl-num = <0 1>;
+		gpio-req-tbl-flags = <0 0>;
+		gpio-req-tbl-label = "FLASH_EN",
+			"FLASH_NOW";
 		status = "ok";
 	};
 
