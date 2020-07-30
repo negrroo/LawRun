@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1293,8 +1293,10 @@ static void kgsl_snapshot_save_frozen_objs(struct work_struct *work)
 			sizeof(struct kgsl_snapshot_section_header));
 	}
 
-	if (size == 0)
+	if (size > device->snapshot_memory.size) {
+		SNAPSHOT_ERR_NOMEM(device, "OBJS");
 		goto done;
+	}
 
 	snapshot->mempool = vmalloc(size);
 
