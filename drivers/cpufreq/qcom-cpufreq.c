@@ -27,6 +27,7 @@
 #include <linux/err.h>
 #include <linux/platform_device.h>
 #include <linux/of.h>
+#include <linux/delay.h>
 #include <linux/of_device.h>
 #include <linux/cpu_cooling.h>
 #include <trace/events/power.h>
@@ -45,6 +46,14 @@ struct cpufreq_suspend_t {
 };
 
 static DEFINE_PER_CPU(struct cpufreq_suspend_t, suspend_data);
+
+struct clk_update_data {
+	struct mutex update_lock;
+	ktime_t last_update;
+};
+
+static struct clk_update_data cpu_update_data[NR_CPUS];
+
 static DEFINE_PER_CPU(int, cached_resolve_idx);
 static DEFINE_PER_CPU(unsigned int, cached_resolve_freq);
 
@@ -79,9 +88,14 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 	int ret = 0;
 	int index;
 	struct cpufreq_frequency_table *table;
+	struct clk_update_data *udata;
+	s64 delta_us;
 	int first_cpu = cpumask_first(policy->related_cpus);
 
 	mutex_lock(&per_cpu(suspend_data, policy->cpu).suspend_mutex);
+
+	udata = &cpu_update_data[cpumask_first(policy->cpus)];
+	mutex_lock(&udata->update_lock);
 
 	if (target_freq == policy->cur)
 		goto done;
@@ -104,9 +118,16 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 		policy->cpu, target_freq, relation,
 		policy->min, policy->max, table[index].frequency);
 
+	/* The old rate needs time to settle before it can be changed again */
+	delta_us = ktime_us_delta(ktime_get_boottime(), udata->last_update);
+	if (delta_us < 10000)
+		usleep_range(10000 - delta_us, 11000 - delta_us);
+	udata->last_update = ktime_get_boottime();
+
 	ret = set_cpu_freq(policy, table[index].frequency,
 			   table[index].driver_data);
 done:
+	mutex_unlock(&udata->update_lock);
 	mutex_unlock(&per_cpu(suspend_data, policy->cpu).suspend_mutex);
 	return ret;
 }
@@ -533,6 +554,7 @@ static int __init msm_cpufreq_register(void)
 		mutex_init(&(per_cpu(suspend_data, cpu).suspend_mutex));
 		per_cpu(suspend_data, cpu).device_suspended = 0;
 		per_cpu(cached_resolve_freq, cpu) = UINT_MAX;
+		mutex_init(&cpu_update_data[cpu].update_lock);
 	}
 
 	rc = platform_driver_register(&msm_cpufreq_plat_driver);
